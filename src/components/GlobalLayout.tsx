@@ -8,10 +8,11 @@ interface GlobalLayoutProps {
 }
 
 const GlobalLayout = ({ children }: GlobalLayoutProps) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [showUserSidebar, setShowUserSidebar] = useState(false);
 
-  if (!user) return <>{children}</>;
+  // Don't show sidebar during loading or when no user
+  if (loading || !user) return <>{children}</>;
 
   return (
     <>

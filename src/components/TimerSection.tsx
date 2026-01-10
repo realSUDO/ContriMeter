@@ -39,6 +39,7 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
   const [sessions, setSessions] = useState<Session[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const intervalRef = useRef<number | null>(null);
+  const recentlyStartedRef = useRef<Set<string>>(new Set());
 
   // Load team sessions
   useEffect(() => {
@@ -62,12 +63,19 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
     }
   }, [teamId, showHistory]);
 
+  const activeTaskIdsRef = useRef<Set<string>>(new Set());
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeTaskIdsRef.current = activeTaskIds;
+  }, [activeTaskIds]);
+
   useEffect(() => {
     if (activeTaskIds.size > 0) {
       intervalRef.current = window.setInterval(() => {
         setTaskTimers(prev => {
           const updated = { ...prev };
-          activeTaskIds.forEach(taskId => {
+          activeTaskIdsRef.current.forEach(taskId => {
             updated[taskId] = (updated[taskId] || 0) + 1;
           });
           return updated;
@@ -89,6 +97,7 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
   };
 
   const handleStart = useCallback(() => {
+    console.log('handleStart called', { selectedTask: selectedTask?.id, activeTaskIds: Array.from(activeTaskIdsRef.current) });
     if (!selectedTask) return;
     
     // Only allow starting timer for tasks assigned to current user
@@ -96,16 +105,32 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
       return;
     }
     
-    // Prevent double clicks by checking current state
+    // Check if already running
+    if (activeTaskIdsRef.current.has(selectedTask.id)) {
+      console.log('Task already running, returning');
+      return;
+    }
+    
+    console.log('Starting timer for task:', selectedTask.id);
+    
+    // Mark as recently started to prevent immediate stopping
+    recentlyStartedRef.current.add(selectedTask.id);
+    setTimeout(() => {
+      recentlyStartedRef.current.delete(selectedTask.id);
+    }, 1000); // Give 1 second for Firebase to sync
+    
+    // Update timer state first
     setActiveTaskIds(prev => {
-      if (prev.has(selectedTask.id)) return prev; // Already running
-      
-      onTaskUpdate(selectedTask.id, { 
-        isActive: true,
-        lastActivity: new Date()
-      });
-      
-      return new Set([...prev, selectedTask.id]);
+      const newSet = new Set([...prev, selectedTask.id]);
+      console.log('Updated activeTaskIds:', Array.from(newSet));
+      return newSet;
+    });
+    
+    // Then update task state
+    console.log('Calling onTaskUpdate with isActive: true');
+    onTaskUpdate(selectedTask.id, { 
+      isActive: true,
+      lastActivity: new Date()
     });
   }, [selectedTask, onTaskUpdate, userId]);
 
@@ -166,7 +191,9 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
   useEffect(() => {
     activeTaskIds.forEach(taskId => {
       const task = tasks.find(t => t.id === taskId);
-      if (task && task.isActive === false) {
+      console.log('Checking task for stop:', taskId, 'task.isActive:', task?.isActive, 'recentlyStarted:', recentlyStartedRef.current.has(taskId));
+      if (task && task.isActive === false && !recentlyStartedRef.current.has(taskId)) {
+        console.log('Stopping timer for task:', taskId);
         setActiveTaskIds(prev => {
           const updated = new Set(prev);
           updated.delete(taskId);

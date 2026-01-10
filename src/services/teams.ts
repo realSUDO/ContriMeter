@@ -8,6 +8,7 @@ import {
   query,
   where,
   updateDoc,
+  deleteDoc,
   arrayUnion,
   serverTimestamp
 } from "firebase/firestore";
@@ -86,4 +87,9 @@ export const getTeamByCode = async (teamCode: string): Promise<Team | null> => {
 export const updateTeam = async (teamCode: string, updates: Partial<Team>): Promise<void> => {
   const teamRef = doc(db, "teams", teamCode);
   await updateDoc(teamRef, updates);
+};
+
+export const deleteTeam = async (teamCode: string): Promise<void> => {
+  const teamRef = doc(db, "teams", teamCode);
+  await deleteDoc(teamRef);
 };

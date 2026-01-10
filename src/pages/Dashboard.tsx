@@ -155,20 +155,6 @@ const Dashboard = () => {
           >
             Join Team
           </button>
-          <button 
-            onClick={async () => {
-              try {
-                const testRef = doc(db, "test", "connection");
-                await setDoc(testRef, { test: true, timestamp: new Date() });
-                alert("Firestore connection works!");
-              } catch (error) {
-                alert(`Firestore error: ${error}`);
-              }
-            }}
-            className="btn-secondary text-xs"
-          >
-            Test DB
-          </button>
         </div>
         
         {/* Micro-copy */}

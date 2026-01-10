@@ -73,12 +73,14 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
     <>
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full w-80 bg-card border-r shadow-lg z-50 transition-transform duration-300 ease-in-out ${
-        isOpen ? 'translate-x-0' : '-translate-x-64'
+        isOpen ? 'translate-x-0' : '-translate-x-72'
       }`}>
         {/* User Icon Button - Inside sidebar */}
         <button
           onClick={onToggle}
-          className="absolute bottom-4 right-4 p-3 bg-primary rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+          className={`absolute bottom-4 p-3 bg-primary rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
+            isOpen ? 'right-4' : 'right-[-24px]'
+          }`}
           title="Toggle profile"
         >
           <User className="w-5 h-5 text-primary-foreground" />
@@ -89,7 +91,9 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
           <h2 className={`text-lg font-semibold text-foreground transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>Profile</h2>
           <button
             onClick={onToggle}
-            className="p-1 text-muted-foreground hover:text-foreground"
+            className={`text-muted-foreground hover:text-foreground absolute top-6 transition-all duration-300 ${
+              isOpen ? 'right-6 p-1' : 'right-[-24px] p-3 bg-primary rounded-full shadow-lg hover:shadow-xl text-primary-foreground'
+            }`}
           >
             <ArrowRightLeft className="w-4 h-4" />
           </button>

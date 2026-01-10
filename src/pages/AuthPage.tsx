@@ -15,7 +15,6 @@ const AuthPage = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -97,15 +96,6 @@ const AuthPage = () => {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <input
-              type="text"
-              placeholder="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="input-clean w-full"
-            />
-          )}
           <input
             type="email"
             placeholder="Email address"

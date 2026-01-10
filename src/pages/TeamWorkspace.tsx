@@ -4,7 +4,7 @@ import { Settings, Archive, MessageCircle, Phone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTeamTasks } from "@/hooks/useTeamTasks";
 import { useTeamMemberProfiles } from "@/hooks/useTeamMemberProfiles";
-import { getTeamByCode, updateTeam } from "@/services/teams";
+import { getTeamByCode, updateTeam, deleteTeam } from "@/services/teams";
 import { createTask, updateTask, deleteTask, archiveTask, unarchiveTask } from "@/services/tasks";
 import TaskSection from "@/components/TaskSection";
 import TimerSection from "@/components/TimerSection";
@@ -12,7 +12,6 @@ import ContributionSection from "@/components/ContributionSection";
 import TeamManageModal from "@/components/TeamManageModal";
 import ArchivedTasksModal from "@/components/ArchivedTasksModal";
 import TeamChat from "@/components/TeamChat";
-import { CallPanel } from "@/components/CallPanel";
 
 interface Task {
   id: string;
@@ -35,7 +34,6 @@ const TeamWorkspace = () => {
   const [team, setTeam] = useState<any>(null);
   const [showArchivedModal, setShowArchivedModal] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [showCallPanel, setShowCallPanel] = useState(false);
   
   const { tasks, loading: tasksLoading } = useTeamTasks(teamId);
   const { memberProfiles } = useTeamMemberProfiles(team?.members || []);
@@ -59,20 +57,22 @@ const TeamWorkspace = () => {
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     if (!teamId) return;
-    
+    console.log('onTaskUpdate called:', taskId, updates);
     try {
       if (tasks.find(t => t.id === taskId)) {
         // Update existing task
+        console.log('Updating existing task with:', updates);
         await updateTask(taskId, updates);
       } else {
         // Create new task
+        console.log('Creating new task');
         await createTask({
           teamId,
           name: updates.name || "New Task",
           assignee: updates.assignee || user?.uid || "Unknown",
           status: updates.status || "pending",
           timeSpent: updates.timeSpent || 0,
-          isActive: updates.isActive || false,
+          isActive: updates.isActive ?? false,
           manuallyMarkedAtRisk: updates.manuallyMarkedAtRisk || false
         });
       }
@@ -138,8 +138,18 @@ const TeamWorkspace = () => {
     navigate("/dashboard");
   };
 
-  const handleDeleteTeam = () => {
-    navigate("/dashboard");
+  const handleDeleteTeam = async () => {
+    if (!teamId || !team || team.leader !== user?.uid) {
+      console.error("Only team leader can delete the team");
+      return;
+    }
+    
+    try {
+      await deleteTeam(teamId);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Error deleting team:", error);
+    }
   };
 
   if (!team) {
@@ -163,9 +173,9 @@ const TeamWorkspace = () => {
           
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowCallPanel(true)}
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-              title="Start team call"
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-not-allowed opacity-50"
+              title="Team calls coming soon!"
+              disabled
             >
               <Phone className="w-4 h-4" />
             </button>
@@ -264,12 +274,6 @@ const TeamWorkspace = () => {
         userName={memberProfiles[user?.uid || ""]?.name || "User"}
       />
 
-      <CallPanel
-        isOpen={showCallPanel}
-        onClose={() => setShowCallPanel(false)}
-        teamId={teamId || ""}
-        userId={user?.uid || ""}
-      />
     </div>
   );
 };
