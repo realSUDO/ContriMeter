@@ -2,6 +2,8 @@
 
 A simple way for teams to stay focused and get things done together.
 
+**🚀 [Try it live](https://contrimeter-techsprint.web.app)**
+
 ![ContriMeter Light Theme](media/screen_light.png)
 
 ## Intro
