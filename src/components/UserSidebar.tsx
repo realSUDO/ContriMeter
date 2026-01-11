@@ -148,7 +148,7 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                      className="w-full mt-1 px-3 py-2 border border-border bg-background text-foreground rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                       placeholder="Your name"
                     />
                   </div>
@@ -158,7 +158,7 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
                       type="text"
                       value={editRole}
                       onChange={(e) => setEditRole(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                      className="w-full mt-1 px-3 py-2 border border-border bg-background text-foreground rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                       placeholder="Your role"
                     />
                   </div>

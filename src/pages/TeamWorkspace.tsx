@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Settings, Archive, MessageCircle, Phone, ArrowLeft } from "lucide-react";
+import { Settings, Archive, MessageCircle, Phone, ArrowLeft, Pencil } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTeamTasks } from "@/hooks/useTeamTasks";
 import { useTeamMemberProfiles } from "@/hooks/useTeamMemberProfiles";
@@ -39,6 +39,8 @@ const TeamWorkspace = () => {
   const [showChat, setShowChat] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
+  const [isEditingTeamName, setIsEditingTeamName] = useState(false);
+  const [editTeamName, setEditTeamName] = useState("");
   
   const { tasks, loading: tasksLoading } = useTeamTasks(teamId);
   const { memberProfiles } = useTeamMemberProfiles(team?.members || []);
@@ -199,6 +201,27 @@ const TeamWorkspace = () => {
     }
   };
 
+  const handleEditTeamName = () => {
+    setEditTeamName(team.name);
+    setIsEditingTeamName(true);
+  };
+
+  const handleSaveTeamName = async () => {
+    if (!team || !editTeamName.trim()) return;
+    
+    try {
+      await updateTeam(team.id, { name: editTeamName.trim() });
+      setIsEditingTeamName(false);
+    } catch (error) {
+      console.error("Error updating team name:", error);
+    }
+  };
+
+  const handleCancelEditTeamName = () => {
+    setIsEditingTeamName(false);
+    setEditTeamName("");
+  };
+
   if (!team || isNavigating) {
     if (showSkeleton || isNavigating) {
     return (
@@ -283,7 +306,36 @@ const TeamWorkspace = () => {
         </div>
 
         <div className="flex items-center gap-3 mb-10">
-          <h1 className="text-3xl font-semibold text-foreground">{team.name}</h1>
+          {isEditingTeamName ? (
+            <input
+              type="text"
+              value={editTeamName}
+              onChange={(e) => setEditTeamName(e.target.value)}
+              className="text-3xl font-semibold bg-transparent border-none outline-none text-foreground p-0 m-0"
+              onBlur={handleSaveTeamName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveTeamName();
+                  e.target.blur();
+                }
+                if (e.key === 'Escape') handleCancelEditTeamName();
+              }}
+              autoFocus
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-semibold text-foreground">{team.name}</h1>
+              {team.leader === user?.uid && (
+                <button
+                  onClick={handleEditTeamName}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                  title="Edit team name"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
           <span className="text-sm text-muted-foreground font-mono bg-card px-2 py-1 rounded">
             {team.code}
           </span>
