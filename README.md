@@ -2,6 +2,8 @@
 
 A simple way for teams to stay focused and get things done together.
 
+![ContriMeter Light Theme](media/screen_light.png)
+
 ## Intro
 
 Most productivity tools are bloated. We built something minimal that actually helps teams work better - track what matters, see progress in real-time, and keep everyone aligned.
@@ -14,6 +16,8 @@ Most productivity tools are bloated. We built something minimal that actually he
 - Fair contributions - Track who's pulling their weight
 - Your preferred vibe - Dark or light theme
 
+![ContriMeter Dark Theme](media/screen_dark.png)
+
 ## Getting Started
 
 ```bash
@@ -24,6 +28,8 @@ npm run dev
 ```
 
 That's it. Open localhost and start being productive.
+
+![ContriMeter Auth](media/auth.png)
 
 ## Tech Stack
 
