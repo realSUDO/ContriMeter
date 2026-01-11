@@ -1,60 +1,42 @@
-# Contrimeter - Team Productivity Tracker
+# Contrimeter
 
-## Project info
+A minimal team productivity tracker that helps teams stay focused and accountable.
 
-A real-time team productivity application built with React, TypeScript, and Firebase.
+## What it does
 
-## How can I edit this code?
+Track tasks, time, and team contributions in real-time. Simple, clean, and effective.
 
-**Use your preferred IDE**
+## Features
 
-Clone this repo and push changes.
+- **Real-time collaboration** - See what your team is working on
+- **Task management** - Create, assign, and track progress
+- **Time tracking** - Built-in timer with visual feedback
+- **Team chat** - Communicate without leaving the workspace
+- **Contribution tracking** - See who's contributing what
+- **Dark/light themes** - Work comfortably any time
 
-Follow these steps:
+## Getting started
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+# Clone and install
+git clone <repo-url>
+cd contrimeter-calm-productivity
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development
 npm run dev
-```
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-- Firebase
-
-## How can I deploy this project?
-
-Build the project and deploy to your preferred hosting platform:
-
-```sh
+# Build for production
 npm run build
 ```
+
+## Tech stack
+
+- React + TypeScript
+- Firebase (Auth, Firestore, Hosting)
+- Tailwind CSS + shadcn/ui
+- Vite
+
+## License
+
+MIT - see LICENSE file
