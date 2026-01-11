@@ -320,7 +320,7 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
                 }`}
               ></div>
               <div
-                className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm transition ${
+                className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-background border shadow-sm transition ${
                   showMyTasksOnly ? 'translate-x-full' : ''
                 }`}
               ></div>
