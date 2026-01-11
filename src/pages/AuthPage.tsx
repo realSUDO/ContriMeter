@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import {
   loginWithEmail,
   signupWithEmail,
@@ -9,13 +10,15 @@ import {
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get("mode") || "login";
   const isLogin = mode === "login";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const getErrorMessage = (error: any) => {
@@ -40,40 +43,43 @@ const AuthPage = () => {
     e.preventDefault();
     if (!email || !password) return;
     
-    setLoading(true);
+    setSubmitting(true);
     setError("");
     try {
       if (isLogin) {
-        await loginWithEmail(email, password);
+        await loginWithEmail(email, password, keepSignedIn);
       } else {
-        await signupWithEmail(email, password);
+        await signupWithEmail(email, password, keepSignedIn);
       }
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Auth error:", error);
       setError(getErrorMessage(error));
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   const handleSocialAuth = async (provider: "google" | "github") => {
-    setLoading(true);
+    setSubmitting(true);
     setError("");
     try {
       if (provider === "google") {
-        await loginWithGoogle();
+        await loginWithGoogle(keepSignedIn);
       } else {
-        await loginWithGithub();
+        await loginWithGithub(keepSignedIn);
       }
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Social auth error:", error);
       setError(getErrorMessage(error));
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6">
@@ -111,6 +117,19 @@ const AuthPage = () => {
             className={`input-clean w-full ${error ? 'border-red-500 text-red-600' : ''}`}
           />
           
+          <div className="flex items-center space-x-2 mt-4">
+            <input
+              type="checkbox"
+              id="keepSignedIn"
+              checked={keepSignedIn}
+              onChange={(e) => setKeepSignedIn(e.target.checked)}
+              className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary focus:ring-2"
+            />
+            <label htmlFor="keepSignedIn" className="text-sm text-muted-foreground">
+              Keep me signed in
+            </label>
+          </div>
+          
           {error && (
             <div className="text-red-500 text-sm mt-2">
               {error}
@@ -119,10 +138,10 @@ const AuthPage = () => {
           
           <button 
             type="submit" 
-            disabled={loading || !email || !password}
+            disabled={submitting || !email || !password}
             className="btn-primary w-full mt-6"
           >
-            {loading ? "Loading..." : isLogin ? "Log In" : "Sign Up"}
+            {submitting ? "Loading..." : isLogin ? "Log In" : "Sign Up"}
           </button>
         </form>
 
@@ -140,7 +159,7 @@ const AuthPage = () => {
             <button
               type="button"
               onClick={() => handleSocialAuth("google")}
-              disabled={loading}
+              disabled={submitting}
               className="btn-secondary text-sm"
             >
               Google
@@ -148,7 +167,7 @@ const AuthPage = () => {
             <button
               type="button"
               onClick={() => handleSocialAuth("github")}
-              disabled={loading}
+              disabled={submitting}
               className="btn-secondary text-sm"
             >
               GitHub

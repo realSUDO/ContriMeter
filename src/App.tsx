@@ -12,6 +12,16 @@ import Dashboard from "./pages/Dashboard";
 import TeamWorkspace from "./pages/TeamWorkspace";
 import NotFound from "./pages/NotFound";
 
+// Initialize theme on app startup
+const initializeTheme = () => {
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'dark') {
+    document.documentElement.classList.add('dark');
+  }
+};
+
+initializeTheme();
+
 const queryClient = new QueryClient();
 
 const App = () => (

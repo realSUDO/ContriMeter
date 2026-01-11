@@ -10,7 +10,8 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  writeBatch
 } from "firebase/firestore";
 
 export interface Task {
@@ -25,6 +26,8 @@ export interface Task {
   createdAt?: Date;
   manuallyMarkedAtRisk?: boolean;
   archived?: boolean;
+  activeUserId?: string; // For common tasks, tracks who is currently working on it
+  completedBy?: string; // For common tasks, tracks who completed it
 }
 
 export const createTask = async (task: Omit<Task, "id" | "createdAt">): Promise<string> => {
@@ -79,11 +82,11 @@ export const getTeamTasks = async (teamId: string): Promise<Task[]> => {
   } as Task));
 };
 
-export const getArchivedTasks = (userId: string, callback: (tasks: Task[]) => void) => {
+export const getArchivedTasks = (teamId: string, callback: (tasks: Task[]) => void) => {
   const tasksRef = collection(db, "tasks");
   const q = query(
     tasksRef, 
-    where("assignee", "==", userId),
+    where("teamId", "==", teamId),
     where("archived", "==", true)
   );
   
@@ -96,6 +99,44 @@ export const getArchivedTasks = (userId: string, callback: (tasks: Task[]) => vo
     } as Task));
     callback(tasks);
   });
+};
+
+export const reassignUserTasksToCommon = async (teamId: string, userId: string): Promise<void> => {
+  const tasksRef = collection(db, "tasks");
+  
+  // Simple query - just get all tasks for this team assigned to this user
+  const q = query(
+    tasksRef, 
+    where("teamId", "==", teamId),
+    where("assignee", "==", userId)
+  );
+  
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.docs.length === 0) {
+    return;
+  }
+  
+  // Batch update all tasks assigned to the user
+  const batch = writeBatch(db);
+  
+  snapshot.docs.forEach((doc) => {
+    const taskData = doc.data();
+    // Skip already archived tasks
+    if (taskData.archived) {
+      return;
+    }
+    
+    const taskRef = doc.ref;
+    batch.update(taskRef, {
+      assignee: "common",
+      isActive: false,
+      activeUserId: null,
+      lastActivity: serverTimestamp()
+    });
+  });
+  
+  await batch.commit();
 };
 
 export const subscribeToTeamTasks = (

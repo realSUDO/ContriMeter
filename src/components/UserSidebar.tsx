@@ -16,7 +16,21 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved === 'dark';
+  });
+
+  // Apply theme on mount and when changed
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
 
   const handleSignOut = async () => {
     try {
@@ -28,7 +42,6 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
-    document.documentElement.classList.toggle('dark');
   };
 
   // Load user profile from database

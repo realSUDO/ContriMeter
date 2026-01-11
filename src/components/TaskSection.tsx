@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Check, AlertTriangle, MoreVertical, Trash2, Archive } from "lucide-react";
+import { Check, AlertTriangle, MoreVertical, Trash2, Archive, Crown, GripVertical } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import { useTeamMemberProfiles } from "@/hooks/useTeamMemberProfiles";
 import { updateContribution, decrementContribution } from "@/services/contributions";
@@ -14,6 +14,9 @@ interface Task {
   lastActivity?: Date;
   createdAt?: Date;
   manuallyMarkedAtRisk?: boolean;
+  activeUserId?: string; // For common tasks, tracks who is currently working on it
+  completedBy?: string; // For common tasks, tracks who completed it
+  archived?: boolean;
 }
 
 interface TaskSectionProps {
@@ -28,19 +31,45 @@ interface TaskSectionProps {
   user?: any;
   teamMembers?: string[];
   teamId?: string;
+  teamLeader?: string;
 }
 
-type FilterType = "all" | "active" | "completed" | "at-risk" | "inactive";
+type FilterType = "all" | "active" | "completed" | "at-risk" | "inactive" | "common";
 
-const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDelete, onTaskArchive, onArchiveAllCompleted, onMarkDone, user, teamMembers, teamId }: TaskSectionProps) => {
+const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDelete, onTaskArchive, onArchiveAllCompleted, onMarkDone, user, teamMembers, teamId, teamLeader }: TaskSectionProps) => {
   const [newTask, setNewTask] = useState("");
   const [assignee, setAssignee] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
   const [taskMenuOpen, setTaskMenuOpen] = useState<string | null>(null);
+  const [draggedTask, setDraggedTask] = useState<string | null>(null);
+  const [dragOverTask, setDragOverTask] = useState<string | null>(null);
+  const [taskOrder, setTaskOrder] = useState<string[]>([]);
 
   const members = teamMembers || [user?.uid].filter(Boolean);
+  // Always show "common" at the top of the dropdown
+  const sortedMembers = members.includes("common") 
+    ? ["common", ...members.filter(m => m !== "common")]
+    : ["common", ...members];
   const { memberProfiles } = useTeamMemberProfiles(members);
+
+  // Load task order from localStorage
+  useEffect(() => {
+    if (teamId) {
+      const savedOrder = localStorage.getItem(`taskOrder_${teamId}`);
+      if (savedOrder) {
+        setTaskOrder(JSON.parse(savedOrder));
+      }
+    }
+  }, [teamId]);
+
+  // Save task order to localStorage
+  const saveTaskOrder = (order: string[]) => {
+    if (teamId) {
+      localStorage.setItem(`taskOrder_${teamId}`, JSON.stringify(order));
+      setTaskOrder(order);
+    }
+  };
 
   // Set default assignee to current user when component mounts
   useEffect(() => {
@@ -51,9 +80,10 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
 
   // Get member display names
   const getMemberName = (memberId: string) => {
+    if (memberId === "common") return "Common";
     if (memberId === user?.uid) return "You";
     const profile = memberProfiles[memberId];
-    return profile?.name || memberId.slice(0, 8) + "...";
+    return profile?.name?.slice(0, 8) || "Unknown";
   };
 
   const addTask = useCallback(() => {
@@ -77,30 +107,48 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
   const toggleStatus = async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (task) {
-      // Only allow task assignee to mark task as done
-      if (task.assignee !== user?.uid) {
-        return;
+      // Permission checks
+      if (task.assignee !== user?.uid && task.assignee !== "common") {
+        return; // Can't modify other users' tasks
+      }
+      
+      // For common tasks that are completed, only completer or leader can unmark
+      if (task.assignee === "common" && task.status === "done" && task.completedBy) {
+        if (task.completedBy !== user?.uid && teamLeader !== user?.uid) {
+          return; // Only completer or leader can unmark completed common tasks
+        }
       }
       
       const newStatus = task.status === "pending" ? "done" : "pending";
-      onTaskUpdate(taskId, { 
+      const updates: Partial<Task> = {
         status: newStatus,
         isActive: false, // Always stop timer when status changes
         lastActivity: new Date()
-      });
+      };
       
-      // Update contributions based on status change
-      if (teamId && task.assignee) {
-        try {
-          if (newStatus === "done") {
-            // Task completed - increment
-            await updateContribution(teamId, task.assignee, 0, 1);
-          } else {
-            // Task unmarked - decrement
-            await decrementContribution(teamId, task.assignee, 1);
+      // For common tasks, clear the active user when completed and track who completed it
+      if (task.assignee === "common") {
+        updates.activeUserId = newStatus === "done" ? null : task.activeUserId;
+        updates.completedBy = newStatus === "done" ? user?.uid : null;
+      }
+      
+      onTaskUpdate(taskId, updates);
+      
+      // Update contributions - for common tasks, credit the actual performer
+      if (teamId) {
+        const contributionUserId = task.assignee === "common" ? (task.activeUserId || user?.uid) : task.assignee;
+        if (contributionUserId && contributionUserId !== "common") {
+          try {
+            if (newStatus === "done") {
+              // Task completed - increment
+              await updateContribution(teamId, contributionUserId, 0, 1);
+            } else {
+              // Task unmarked - decrement
+              await decrementContribution(teamId, contributionUserId, 1);
+            }
+          } catch (error) {
+            console.error("Error updating contribution:", error);
           }
-        } catch (error) {
-          console.error("Error updating contribution:", error);
         }
       }
       
@@ -119,7 +167,8 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
   };
 
   const markSelectedDone = useCallback(() => {
-    if (selectedTask && selectedTask.status === "pending" && selectedTask.assignee === user?.uid) {
+    if (selectedTask && selectedTask.status === "pending" && 
+        (selectedTask.assignee === user?.uid || selectedTask.assignee === "common")) {
       toggleStatus(selectedTask.id);
     }
   }, [selectedTask, user?.uid]);
@@ -171,8 +220,11 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
   };
 
   const filteredTasks = tasks.filter(task => {
-    // Filter by ownership first - check if task is assigned to current user
-    if (showMyTasksOnly && task.assignee !== (user?.uid || "You")) return false;
+    // Exclude archived tasks
+    if (task.archived) return false;
+    
+    // Filter by ownership first - check if task is assigned to current user or common
+    if (showMyTasksOnly && task.assignee !== (user?.uid || "You") && task.assignee !== "common") return false;
     
     // Then filter by status
     const status = getTaskStatus(task);
@@ -180,8 +232,75 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
     if (filter === "completed") return status === "completed";
     if (filter === "at-risk") return status === "at-risk";
     if (filter === "inactive") return status === "inactive";
+    if (filter === "common") return task.assignee === "common";
     return true;
+  }).sort((a, b) => {
+    // Sort by saved order only (don't use preview order for sorting)
+    const aIndex = taskOrder.indexOf(a.id);
+    const bIndex = taskOrder.indexOf(b.id);
+    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    return (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0);
   });
+
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    setDraggedTask(taskId);
+    const currentTasks = filteredTasks.map(t => t.id);
+    setPreviewOrder(currentTasks);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", taskId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragEnter = (e: React.DragEvent, taskId: string) => {
+    e.preventDefault();
+    if (draggedTask && draggedTask !== taskId) {
+      setDragOverTask(taskId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverTask(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetTaskId: string) => {
+    e.preventDefault();
+    if (!draggedTask || draggedTask === targetTaskId) {
+      setDraggedTask(null);
+      setDragOverTask(null);
+      return;
+    }
+
+    const currentTasks = filteredTasks.map(t => t.id);
+    const draggedIndex = currentTasks.indexOf(draggedTask);
+    const targetIndex = currentTasks.indexOf(targetTaskId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedTask(null);
+      setDragOverTask(null);
+      return;
+    }
+
+    const newOrder = [...currentTasks];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedTask);
+
+    saveTaskOrder(newOrder);
+    setDraggedTask(null);
+    setDragOverTask(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTask(null);
+    setDragOverTask(null);
+  };
 
   return (
     <div className="card-soft">
@@ -216,7 +335,7 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
       {/* Filter Tabs */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex gap-1 p-1 bg-background rounded-lg w-fit">
-          {(["all", "active", "completed", "at-risk", "inactive"] as FilterType[]).map((f) => (
+          {(["all", "active", "completed", "at-risk", "inactive", "common"] as FilterType[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -257,7 +376,7 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
           onChange={(e) => setAssignee(e.target.value)}
           className="input-clean sm:w-40"
         >
-          {members.map(memberId => (
+          {sortedMembers.map(memberId => (
             <option key={memberId} value={memberId}>
               {getMemberName(memberId)}
             </option>
@@ -268,15 +387,30 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
 
       {/* Task List */}
       <div className="space-y-2">
-        {filteredTasks.map(task => (
+        {filteredTasks.map((task, index) => (
           <div 
             key={task.id}
+            draggable
+            onDragStart={(e) => handleDragStart(e, task.id)}
+            onDragOver={handleDragOver}
+            onDragEnter={(e) => handleDragEnter(e, task.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, task.id)}
+            onDragEnd={handleDragEnd}
             onClick={() => onTaskSelect(selectedTask?.id === task.id ? null : task)}
-            className={`flex items-center gap-4 p-4 rounded-lg transition-all duration-200 cursor-pointer
+            className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-all duration-200
                        ${selectedTask?.id === task.id 
                          ? "bg-primary/5 ring-1 ring-primary/20" 
-                         : "bg-background hover:bg-background/80"}`}
+                         : "bg-background hover:bg-background/80"}
+                       ${draggedTask === task.id ? "opacity-50 scale-95 shadow-lg" : ""}
+                       ${dragOverTask === task.id ? "scale-105 bg-primary/10 ring-2 ring-primary/30" : ""}`}
           >
+            <div 
+              className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="w-4 h-4" />
+            </div>
             <button
               onClick={(e) => { e.stopPropagation(); toggleStatus(task.id); }}
               className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0
@@ -291,9 +425,31 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
               <p className={`font-medium truncate ${task.status === "done" ? "text-muted-foreground line-through" : "text-foreground"}`}>
                 {task.name}
               </p>
-              <p className="text-sm text-muted-foreground">
-                {getMemberName(task.assignee)} • {task.timeSpent || 0}min
-                {task.isActive && " • Running"}
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <span>{getMemberName(task.assignee)}</span>
+                {task.assignee === teamLeader && (
+                  <Crown className="w-3 h-3 text-accent" />
+                )}
+                {task.assignee === "common" && task.activeUserId && (
+                  <>
+                    <span> ({getMemberName(task.activeUserId)}</span>
+                    {task.activeUserId === teamLeader && (
+                      <Crown className="w-3 h-3 text-accent" />
+                    )}
+                    <span>)</span>
+                  </>
+                )}
+                {task.assignee === "common" && task.status === "done" && task.completedBy && (
+                  <>
+                    <span> (completed by {getMemberName(task.completedBy)}</span>
+                    {task.completedBy === teamLeader && (
+                      <Crown className="w-3 h-3 text-accent" />
+                    )}
+                    <span>)</span>
+                  </>
+                )}
+                <span> • {task.timeSpent || 0}min</span>
+                {task.isActive && <span> • Running</span>}
               </p>
             </div>
             
@@ -330,14 +486,14 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (task.assignee === user?.uid) {
+                        if (task.assignee === user?.uid || task.assignee === "common") {
                           onTaskArchive?.(task.id);
                         }
                         setTaskMenuOpen(null);
                       }}
-                      disabled={task.assignee !== user?.uid}
+                      disabled={task.assignee !== user?.uid && task.assignee !== "common"}
                       className={`w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2 ${
-                        task.assignee !== user?.uid ? 'opacity-50 cursor-not-allowed' : ''
+                        task.assignee !== user?.uid && task.assignee !== "common" ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
                       <Archive className="w-3 h-3" />
@@ -349,7 +505,10 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
                         onTaskDelete?.(task.id);
                         setTaskMenuOpen(null);
                       }}
-                      className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted text-red-600 flex items-center gap-2"
+                      disabled={task.assignee !== user?.uid && task.assignee !== "common" && teamLeader !== user?.uid}
+                      className={`w-full px-3 py-1.5 text-left text-sm hover:bg-muted text-red-600 flex items-center gap-2 ${
+                        task.assignee !== user?.uid && task.assignee !== "common" && teamLeader !== user?.uid ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
                       <Trash2 className="w-3 h-3" />
                       Delete

@@ -33,7 +33,7 @@ export const createTeam = async (teamName: string, leaderUid: string, teamCode: 
       name: teamName,
       code: teamCode,
       leader: leaderUid,
-      members: [leaderUid],
+      members: [leaderUid, "common"],
       createdAt: serverTimestamp()
     };
     console.log("Team data:", teamData);
@@ -92,4 +92,20 @@ export const updateTeam = async (teamCode: string, updates: Partial<Team>): Prom
 export const deleteTeam = async (teamCode: string): Promise<void> => {
   const teamRef = doc(db, "teams", teamCode);
   await deleteDoc(teamRef);
+};
+
+export const leaveTeam = async (teamCode: string, userUid: string): Promise<void> => {
+  const teamRef = doc(db, "teams", teamCode);
+  const teamSnap = await getDoc(teamRef);
+  
+  if (!teamSnap.exists()) {
+    throw new Error("Team does not exist");
+  }
+
+  const teamData = teamSnap.data();
+  const updatedMembers = teamData.members.filter((id: string) => id !== userUid);
+  
+  await updateDoc(teamRef, {
+    members: updatedMembers
+  });
 };

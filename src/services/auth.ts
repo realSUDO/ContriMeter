@@ -5,22 +5,33 @@ import {
   GoogleAuthProvider,
   GithubAuthProvider,
   signInWithPopup,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 import { auth } from "../firebase";
 
 const googleProvider = new GoogleAuthProvider();
 const githubProvider = new GithubAuthProvider();
 
-export const signupWithEmail = (email: string, password: string) =>
-  createUserWithEmailAndPassword(auth, email, password);
+export const signupWithEmail = (email: string, password: string, keepSignedIn: boolean = true) => {
+  setPersistence(auth, keepSignedIn ? browserLocalPersistence : browserSessionPersistence);
+  return createUserWithEmailAndPassword(auth, email, password);
+};
 
-export const loginWithEmail = (email: string, password: string) =>
-  signInWithEmailAndPassword(auth, email, password);
+export const loginWithEmail = (email: string, password: string, keepSignedIn: boolean = true) => {
+  setPersistence(auth, keepSignedIn ? browserLocalPersistence : browserSessionPersistence);
+  return signInWithEmailAndPassword(auth, email, password);
+};
 
-export const loginWithGoogle = () =>
-  signInWithPopup(auth, googleProvider);
+export const loginWithGoogle = (keepSignedIn: boolean = true) => {
+  setPersistence(auth, keepSignedIn ? browserLocalPersistence : browserSessionPersistence);
+  return signInWithPopup(auth, googleProvider);
+};
 
-export const loginWithGithub = () =>
-  signInWithPopup(auth, githubProvider);
+export const loginWithGithub = (keepSignedIn: boolean = true) => {
+  setPersistence(auth, keepSignedIn ? browserLocalPersistence : browserSessionPersistence);
+  return signInWithPopup(auth, githubProvider);
+};
 
 export const logout = () => signOut(auth);

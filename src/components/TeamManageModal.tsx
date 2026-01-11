@@ -75,20 +75,19 @@ const TeamManageModal = ({
         </div>
         
         <div className="border-t border-border pt-4 space-y-2">
-          {isLeader ? (
+          <button
+            onClick={onLeaveTeam}
+            className="w-full py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Leave Team
+          </button>
+          {isLeader && (
             <button
               onClick={onDeleteTeam}
-              className="w-full py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2.5 text-sm text-red-600 hover:text-red-700 transition-colors flex items-center justify-center gap-2"
             >
               Delete Team
-            </button>
-          ) : (
-            <button
-              onClick={onLeaveTeam}
-              className="w-full py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
-            >
-              <LogOut className="w-4 h-4" />
-              Leave Team
             </button>
           )}
         </div>

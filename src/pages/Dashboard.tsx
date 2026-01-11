@@ -8,6 +8,7 @@ import { createUserProfile, getUserProfile, addTeamToUser } from "@/services/use
 import { db } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import TeamCard from "@/components/TeamCard";
+import { Skeleton } from "@/components/ui/skeleton";
 import CreateTeamModal from "@/components/CreateTeamModal";
 import JoinTeamModal from "@/components/JoinTeamModal";
 
@@ -130,8 +131,26 @@ const Dashboard = () => {
   // Show main UI even if teams are still loading
   if (!userInitialized) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Initializing...</div>
+      <div className="min-h-screen bg-background px-6 py-12">
+        <div className="max-w-2xl mx-auto">
+          <Skeleton className="h-9 w-48 mb-8" />
+
+          <div className="flex gap-3 mb-3">
+            <Skeleton className="h-10 w-28" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+          
+          <div className="flex gap-6 mb-10">
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-36" />
+          </div>
+
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

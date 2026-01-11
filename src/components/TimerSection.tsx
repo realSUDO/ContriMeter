@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Square, History } from "lucide-react";
 import SessionHistory from "./SessionHistory";
+import HourglassIcon from "./LottieHourglass";
 import { updateContribution } from "@/services/contributions";
 import { addSession, getTeamSessions, Session } from "@/services/sessions";
 
@@ -100,8 +101,13 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
     console.log('handleStart called', { selectedTask: selectedTask?.id, activeTaskIds: Array.from(activeTaskIdsRef.current) });
     if (!selectedTask) return;
     
-    // Only allow starting timer for tasks assigned to current user
-    if (selectedTask.assignee !== userId) {
+    // Only allow starting timer for tasks assigned to current user or common tasks
+    if (selectedTask.assignee !== userId && selectedTask.assignee !== "common") {
+      return;
+    }
+    
+    // For common tasks, check if someone else is already working on it
+    if (selectedTask.assignee === "common" && selectedTask.activeUserId && selectedTask.activeUserId !== userId) {
       return;
     }
     
@@ -128,16 +134,43 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
     
     // Then update task state
     console.log('Calling onTaskUpdate with isActive: true');
-    onTaskUpdate(selectedTask.id, { 
+    const updates: any = { 
       isActive: true,
       lastActivity: new Date()
-    });
+    };
+    
+    // For common tasks, set the active user
+    if (selectedTask.assignee === "common") {
+      updates.activeUserId = userId;
+    }
+    
+    onTaskUpdate(selectedTask.id, updates);
   }, [selectedTask, onTaskUpdate, userId]);
 
   const handleStop = useCallback(async () => {
     if (!selectedTask || !activeTaskIds.has(selectedTask.id)) return;
     
     const duration = taskTimers[selectedTask.id] || 0;
+    
+    // Stop timer immediately in UI
+    setActiveTaskIds(prev => {
+      const updated = new Set(prev);
+      updated.delete(selectedTask.id);
+      return updated;
+    });
+    setTaskTimers(prev => ({ ...prev, [selectedTask.id]: 0 }));
+    
+    // Always update task to mark as inactive
+    const updates: any = { 
+      isActive: false,
+      lastActivity: new Date()
+    };
+    
+    // For common tasks, clear the active user immediately
+    if (selectedTask.assignee === "common") {
+      updates.activeUserId = null; // Use null instead of undefined for Firestore
+    }
+    
     if (duration > 0) {
       const newSession: Session = {
         id: Date.now().toString(),
@@ -149,32 +182,26 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
       };
       setSessions(prev => [newSession, ...prev]);
       
-      // Save session to Firestore
-      if (teamId && userId) {
-        await addSession(userId, teamId, selectedTask.name, duration);
-      }
+      // Add accumulated time to the updates
+      const totalTimeMinutes = Math.floor(duration / 60);
+      updates.timeSpent = (selectedTask.timeSpent || 0) + totalTimeMinutes;
       
-      // Update task with accumulated time
-      const totalTimeMinutes = Math.floor(duration / 60); // Convert to minutes
-      onTaskUpdate(selectedTask.id, { 
-        timeSpent: (selectedTask.timeSpent || 0) + totalTimeMinutes,
-        isActive: false,
-        lastActivity: new Date()
-      });
+      // Background operations - don't await to avoid UI delay
+      if (teamId && userId) {
+        addSession(userId, teamId, selectedTask.name, duration);
+      }
 
-      // Update contributions for the task assignee (use seconds for real-time updates)
-      if (teamId && selectedTask.assignee) {
-        await updateContribution(teamId, selectedTask.assignee, duration, 0); // Pass seconds directly
+      if (teamId) {
+        const contributionUserId = selectedTask.assignee === "common" ? (selectedTask.activeUserId || userId) : selectedTask.assignee;
+        if (contributionUserId && contributionUserId !== "common") {
+          updateContribution(teamId, contributionUserId, duration, 0);
+        }
       }
     }
     
-    setActiveTaskIds(prev => {
-      const updated = new Set(prev);
-      updated.delete(selectedTask.id);
-      return updated;
-    });
-    setTaskTimers(prev => ({ ...prev, [selectedTask.id]: 0 }));
-  }, [selectedTask, activeTaskIds, taskTimers, onTaskUpdate]);
+    // Apply all updates in a single call
+    onTaskUpdate(selectedTask.id, updates);
+  }, [selectedTask, activeTaskIds, taskTimers, onTaskUpdate, teamId, userId]);
 
   const stopTaskTimer = useCallback((taskId: string) => {
     if (!activeTaskIds.has(taskId)) return;
@@ -227,7 +254,10 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
   return (
     <div className="card-soft text-center">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-foreground">Timer</h2>
+        <div className="flex items-center gap-2">
+          <HourglassIcon isActive={isRunning} />
+          <h2 className="text-lg font-semibold text-foreground">Hourglass</h2>
+        </div>
         <button
           onClick={() => setShowHistory(!showHistory)}
           className={`p-2 rounded-lg transition-colors ${showHistory ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}

@@ -1,17 +1,20 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Settings, Archive, MessageCircle, Phone } from "lucide-react";
+import { Settings, Archive, MessageCircle, Phone, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTeamTasks } from "@/hooks/useTeamTasks";
 import { useTeamMemberProfiles } from "@/hooks/useTeamMemberProfiles";
 import { getTeamByCode, updateTeam, deleteTeam } from "@/services/teams";
 import { createTask, updateTask, deleteTask, archiveTask, unarchiveTask } from "@/services/tasks";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/firebase";
 import TaskSection from "@/components/TaskSection";
 import TimerSection from "@/components/TimerSection";
 import ContributionSection from "@/components/ContributionSection";
 import TeamManageModal from "@/components/TeamManageModal";
 import ArchivedTasksModal from "@/components/ArchivedTasksModal";
 import TeamChat from "@/components/TeamChat";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Task {
   id: string;
@@ -34,25 +37,40 @@ const TeamWorkspace = () => {
   const [team, setTeam] = useState<any>(null);
   const [showArchivedModal, setShowArchivedModal] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(false);
   
   const { tasks, loading: tasksLoading } = useTeamTasks(teamId);
   const { memberProfiles } = useTeamMemberProfiles(team?.members || []);
 
-  // Load team data
+  // Load team data with real-time subscription
   useEffect(() => {
     if (!teamId) return;
     
-    const loadTeam = async () => {
-      try {
-        const teamData = await getTeamByCode(teamId);
-        setTeam(teamData);
-      } catch (error) {
-        console.error("Error loading team:", error);
+    const timer = setTimeout(() => {
+      if (!team) setShowSkeleton(true);
+    }, 100);
+    
+    const teamRef = doc(db, "teams", teamId);
+    const unsubscribe = onSnapshot(teamRef, (doc) => {
+      if (doc.exists()) {
+        setTeam({ id: doc.id, ...doc.data() });
+        setShowSkeleton(false);
+      } else {
+        console.error("Team not found");
         navigate("/dashboard");
       }
-    };
+      clearTimeout(timer);
+    }, (error) => {
+      console.error("Error loading team:", error);
+      navigate("/dashboard");
+      clearTimeout(timer);
+    });
     
-    loadTeam();
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
   }, [teamId, navigate]);
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
@@ -82,8 +100,6 @@ const TeamWorkspace = () => {
   };
 
   const handleTaskDelete = async (taskId: string) => {
-    if (!confirm("Are you sure you want to delete this task?")) return;
-    
     try {
       await deleteTask(taskId);
     } catch (error) {
@@ -112,12 +128,14 @@ const TeamWorkspace = () => {
     }
   };
 
-  // Create team members array with real names
-  const teamMembersWithNames = team?.members?.map((memberId: string) => ({
-    id: memberId,
-    name: memberId === user?.uid ? "You" : (memberProfiles[memberId]?.name || memberId.slice(0, 8) + "..."),
-    isLeader: team?.leader === memberId
-  })) || [];
+  // Create team members array with real names (exclude "common")
+  const teamMembersWithNames = team?.members
+    ?.filter((memberId: string) => memberId !== "common")
+    ?.map((memberId: string) => ({
+      id: memberId,
+      name: memberId === user?.uid ? "You" : (memberProfiles[memberId]?.name?.slice(0, 8) || "Unknown"),
+      isLeader: team?.leader === memberId
+    })) || [];
 
   const handleRemoveMember = async (memberId: string) => {
     if (!team || team.leader !== user?.uid) return; // Only leader can remove members
@@ -125,6 +143,10 @@ const TeamWorkspace = () => {
     try {
       const updatedMembers = team.members.filter((id: string) => id !== memberId);
       await updateTeam(team.code, { members: updatedMembers });
+      
+      // Reassign the removed member's tasks to common
+      const { reassignUserTasksToCommon } = await import("@/services/tasks");
+      await reassignUserTasksToCommon(teamId, memberId);
       
       // Update local state
       setTeam({ ...team, members: updatedMembers });
@@ -134,8 +156,33 @@ const TeamWorkspace = () => {
     }
   };
 
-  const handleLeaveTeam = () => {
-    navigate("/dashboard");
+  const handleLeaveTeam = async () => {
+    if (!teamId || !user?.uid || !team) return;
+    
+    try {
+      // If leader is leaving, transfer leadership to next member (excluding "common")
+      if (team.leader === user.uid) {
+        const nextLeader = team.members.find((memberId: string) => 
+          memberId !== user.uid && memberId !== "common"
+        );
+        
+        if (nextLeader) {
+          // Transfer leadership first
+          await updateTeam(team.code, { leader: nextLeader });
+        }
+      }
+      
+      // Reassign the leaving user's tasks to common before leaving
+      const { reassignUserTasksToCommon } = await import("@/services/tasks");
+      await reassignUserTasksToCommon(teamId, user.uid);
+      
+      const { leaveTeam } = await import("@/services/teams");
+      await leaveTeam(teamId, user.uid);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Error leaving team:", error);
+      alert("Failed to leave team. Please try again.");
+    }
   };
 
   const handleDeleteTeam = async () => {
@@ -152,12 +199,40 @@ const TeamWorkspace = () => {
     }
   };
 
-  if (!team) {
+  if (!team || isNavigating) {
+    if (showSkeleton || isNavigating) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading team...</div>
+      <div className="min-h-screen bg-background px-6 py-12">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <Skeleton className="h-5 w-32" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8 rounded" />
+              <Skeleton className="h-8 w-8 rounded" />
+              <Skeleton className="h-8 w-8 rounded" />
+              <Skeleton className="h-8 w-8 rounded" />
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 mb-10">
+            <Skeleton className="h-9 w-48" />
+            <Skeleton className="h-6 w-16" />
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Skeleton className="h-96 w-full rounded-lg" />
+            </div>
+            <div className="space-y-6">
+              <Skeleton className="h-64 w-full rounded-lg" />
+              <Skeleton className="h-64 w-full rounded-lg" />
+            </div>
+          </div>
+        </div>
       </div>
     );
+    }
+    return null; // Don't render anything during the first 100ms
   }
 
   return (
@@ -165,10 +240,14 @@ const TeamWorkspace = () => {
       <div className="max-w-5xl mx-auto animate-fade-in">
         <div className="flex items-center justify-between mb-8">
           <button 
-            onClick={() => navigate("/dashboard")}
-            className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+            onClick={() => {
+              setIsNavigating(true);
+              navigate("/dashboard");
+            }}
+            className="text-muted-foreground hover:text-foreground transition-colors text-sm flex items-center gap-1"
           >
-            ← Back to teams
+            <ArrowLeft className="w-4 h-4" />
+            Back to teams
           </button>
           
           <div className="flex items-center gap-2">
@@ -180,7 +259,7 @@ const TeamWorkspace = () => {
               <Phone className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setShowChat(true)}
+              onClick={() => setShowChat(!showChat)}
               className="p-2 text-muted-foreground hover:text-foreground transition-colors"
               title="Team chat"
             >
@@ -224,6 +303,7 @@ const TeamWorkspace = () => {
               user={user}
               teamMembers={team?.members || []}
               teamId={teamId}
+              teamLeader={team?.leader}
             />
           </div>
 
@@ -242,6 +322,7 @@ const TeamWorkspace = () => {
               memberProfiles={memberProfiles}
               tasks={tasks}
               user={user}
+              teamLeader={team?.leader}
             />
           </div>
         </div>

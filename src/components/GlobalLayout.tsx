@@ -9,7 +9,17 @@ interface GlobalLayoutProps {
 
 const GlobalLayout = ({ children }: GlobalLayoutProps) => {
   const { user, loading } = useAuth();
-  const [showUserSidebar, setShowUserSidebar] = useState(false);
+  const [showUserSidebar, setShowUserSidebar] = useState(() => {
+    const saved = localStorage.getItem('sidebarOpen');
+    return saved === 'true';
+  });
+
+  // Save sidebar state to localStorage when it changes
+  const toggleSidebar = () => {
+    const newState = !showUserSidebar;
+    setShowUserSidebar(newState);
+    localStorage.setItem('sidebarOpen', newState.toString());
+  };
 
   // Don't show sidebar during loading or when no user
   if (loading || !user) return <>{children}</>;
@@ -20,7 +30,7 @@ const GlobalLayout = ({ children }: GlobalLayoutProps) => {
       
       <UserSidebar
         isOpen={showUserSidebar}
-        onToggle={() => setShowUserSidebar(!showUserSidebar)}
+        onToggle={toggleSidebar}
       />
     </>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Crown } from "lucide-react";
 import CircularProgress from "./CircularProgress";
 import StatusBadge, { calculateStatus } from "./StatusBadge";
 import LastActiveIndicator from "./LastActiveIndicator";
@@ -10,35 +11,46 @@ interface ContributionSectionProps {
   memberProfiles?: Record<string, any>;
   tasks?: any[];
   user?: any;
+  teamLeader?: string;
 }
 
-const ContributionSection = ({ teamId, teamMembers = [], memberProfiles = {}, tasks = [], user }: ContributionSectionProps) => {
+const ContributionSection = ({ teamId, teamMembers = [], memberProfiles = {}, tasks = [], user, teamLeader }: ContributionSectionProps) => {
   const { contributions, loading } = useTeamContributions(teamId);
 
-  // Create member data with contributions
-  const membersWithScores = teamMembers.map(memberId => {
+  // Create member data with contributions (exclude "common" user)
+  // Show ALL team members, even those without contribution records yet
+  const membersWithScores = teamMembers
+    .filter(memberId => memberId !== "common")
+    .map(memberId => {
     const contribution = contributions.find(c => c.userId === memberId);
     const profile = memberProfiles[memberId];
     
     const tasksCompleted = contribution?.tasksCompleted || 0;
     const tasksAssigned = tasks.filter(t => t.assignee === memberId).length;
     const timeSpent = contribution?.totalTimeSpent || 0;
+    // For new members without contributions, use current time as lastActive
     const lastActive = contribution?.lastActive || new Date();
     const lastActiveMinutes = Math.floor((Date.now() - lastActive.getTime()) / (1000 * 60));
     
-    // Calculate progress percentage: (tasks completed / tasks assigned) * 100
-    const progressPercentage = tasksAssigned > 0 ? (tasksCompleted / tasksAssigned) * 100 : 0;
+    // Progress bar: only personal tasks (excludes common tasks)
+    const personalTasksCompleted = tasks.filter(t => t.assignee === memberId && t.status === "done").length;
+    const personalTasksAssigned = tasks.filter(t => t.assignee === memberId).length;
+    const progressBarPercentage = personalTasksAssigned > 0 ? (personalTasksCompleted / personalTasksAssigned) * 100 : 0;
+    
+    // Overall percentage: includes common tasks (from contributions)
+    const overallPercentage = tasksAssigned > 0 ? (tasksCompleted / tasksAssigned) * 100 : 0;
     
     return {
       id: memberId,
       name: memberId === user?.uid 
-        ? `${profile?.name || `User ${memberId.slice(-4)}`} (You)`
-        : profile?.name || `User ${memberId.slice(-4)}`,
+        ? `${profile?.name?.slice(0, 8) || "You"} (You)`
+        : profile?.name?.slice(0, 8) || "Unknown",
       tasksCompleted,
       tasksAssigned,
       timeSpent,
       lastActiveMinutes,
-      progressPercentage,
+      progressPercentage: progressBarPercentage, // For circular progress bar (personal tasks only)
+      overallPercentage, // For display percentage (includes common tasks)
       score: (tasksCompleted * 10) + timeSpent,
       status: calculateStatus(tasksCompleted, timeSpent, lastActiveMinutes),
     };
@@ -76,6 +88,9 @@ const ContributionSection = ({ teamId, teamMembers = [], memberProfiles = {}, ta
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <h3 className="font-medium text-foreground truncate">{member.name}</h3>
+                  {member.id === teamLeader && (
+                    <Crown className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <span className="text-sm text-muted-foreground">
@@ -86,11 +101,6 @@ const ContributionSection = ({ teamId, teamMembers = [], memberProfiles = {}, ta
                   </span>
                 </div>
                 <LastActiveIndicator minutes={member.lastActiveMinutes} className="mt-1" />
-              </div>
-              
-              <div className="text-right flex-shrink-0">
-                <p className="text-lg font-semibold text-foreground">{Math.round(member.progressPercentage)}%</p>
-                <p className="text-xs text-muted-foreground">progress</p>
               </div>
             </div>
           );
