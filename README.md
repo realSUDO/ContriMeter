@@ -1,42 +1,45 @@
-# Contrimeter
+# ContriMeter
 
-A minimal team productivity tracker that helps teams stay focused and accountable.
+A simple way for teams to stay focused and get things done together.
 
-## What it does
+## Intro
 
-Track tasks, time, and team contributions in real-time. Simple, clean, and effective.
+Most productivity tools are bloated. We built something minimal that actually helps teams work better - track what matters, see progress in real-time, and keep everyone aligned.
 
-## Features
+**What you get:**
+- Tasks that make sense - Create, assign, drag to reorder. No complexity.
+- Time that counts - Built-in timer with a satisfying hourglass animation
+- Team awareness - See who's working on what, right now
+- Quick communication - Chat without switching apps
+- Fair contributions - Track who's pulling their weight
+- Your preferred vibe - Dark or light theme
 
-- **Real-time collaboration** - See what your team is working on
-- **Task management** - Create, assign, and track progress
-- **Time tracking** - Built-in timer with visual feedback
-- **Team chat** - Communicate without leaving the workspace
-- **Contribution tracking** - See who's contributing what
-- **Dark/light themes** - Work comfortably any time
-
-## Getting started
+## Getting Started
 
 ```bash
-# Clone and install
-git clone <repo-url>
-cd contrimeter-calm-productivity
+git clone https://github.com/realSUDO/ContriMeter.git
+cd ContriMeter
 npm install
-
-# Start development
 npm run dev
-
-# Build for production
-npm run build
 ```
 
-## Tech stack
+That's it. Open localhost and start being productive.
 
-- React + TypeScript
-- Firebase (Auth, Firestore, Hosting)
-- Tailwind CSS + shadcn/ui
-- Vite
+## Tech Stack
+
+Built with React, TypeScript, Firebase, Tailwind CSS. The good stuff, nothing fancy.
+
+## Use Case
+
+Perfect for small to medium teams who want to:
+- Track project progress without overhead
+- See real-time team activity and contributions
+- Communicate quickly without context switching
+- Maintain accountability in a fair, transparent way
+- Focus on work instead of managing tools
+
+Whether you're a startup, remote team, or project group - ContriMeter keeps everyone aligned and productive.
 
 ## License
 
-MIT - see LICENSE file
+MIT - use it however you want.

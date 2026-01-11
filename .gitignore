@@ -37,3 +37,6 @@ firebase-adminsdk-*.json
 
 # Kiro CLI
 kiro/
+
+# Documentation
+JITSI_INTEGRATION.md
