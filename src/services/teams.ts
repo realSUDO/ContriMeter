@@ -115,6 +115,12 @@ export const deleteTeam = async (teamCode: string): Promise<void> => {
   const messagesSnap = await getDocs(messagesQuery);
   messagesSnap.docs.forEach(doc => batch.delete(doc.ref));
   
+  // Delete all sessions for this team
+  const sessionsRef = collection(db, "sessions");
+  const sessionsQuery = query(sessionsRef, where("teamId", "==", teamCode));
+  const sessionsSnap = await getDocs(sessionsQuery);
+  sessionsSnap.docs.forEach(doc => batch.delete(doc.ref));
+  
   await batch.commit();
 };
 
