@@ -14,6 +14,7 @@ import ContributionSection from "@/components/ContributionSection";
 import TeamManageModal from "@/components/TeamManageModal";
 import ArchivedTasksModal from "@/components/ArchivedTasksModal";
 import TeamChat from "@/components/TeamChat";
+import InviteCodeDisplay from "@/components/InviteCodeDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Task {
@@ -336,9 +337,7 @@ const TeamWorkspace = () => {
               )}
             </div>
           )}
-          <span className="text-sm text-muted-foreground font-mono bg-card px-2 py-1 rounded">
-            {team.code}
-          </span>
+          <InviteCodeDisplay code={team.code} />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Check, AlertTriangle, MoreVertical, Trash2, Archive, Crown, GripVertical } from "lucide-react";
 import StatusBadge from "./StatusBadge";
+import MemberAssignmentDropdown from "./ui/member-assignment-dropdown";
 import { useTeamMemberProfiles } from "@/hooks/useTeamMemberProfiles";
 import { updateContribution, decrementContribution } from "@/services/contributions";
 
@@ -53,6 +54,22 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
     : ["common", ...members];
   const { memberProfiles } = useTeamMemberProfiles(members);
 
+  // Get member display names
+  const getMemberName = (memberId: string) => {
+    if (memberId === "common") return "Common";
+    if (memberId === user?.uid) return "You";
+    const profile = memberProfiles[memberId];
+    return profile?.name?.slice(0, 8) || "Unknown";
+  };
+
+  // Transform members for the dropdown component
+  const memberOptions = sortedMembers.map(memberId => ({
+    id: memberId,
+    name: getMemberName(memberId),
+    isLeader: memberId === teamLeader,
+    isOnline: true // You can add online status logic here if needed
+  }));
+
   // Load task order from localStorage
   useEffect(() => {
     if (teamId) {
@@ -78,13 +95,7 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
     }
   }, [user?.uid, assignee]);
 
-  // Get member display names
-  const getMemberName = (memberId: string) => {
-    if (memberId === "common") return "Common";
-    if (memberId === user?.uid) return "You";
-    const profile = memberProfiles[memberId];
-    return profile?.name?.slice(0, 8) || "Unknown";
-  };
+
 
   const addTask = useCallback(() => {
     if (!newTask.trim()) return;
@@ -247,7 +258,6 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     setDraggedTask(taskId);
     const currentTasks = filteredTasks.map(t => t.id);
-    setPreviewOrder(currentTasks);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", taskId);
   };
@@ -371,17 +381,15 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
           onKeyDown={(e) => e.key === "Enter" && addTask()}
           className="input-clean flex-1"
         />
-        <select 
-          value={assignee}
-          onChange={(e) => setAssignee(e.target.value)}
-          className="input-clean sm:w-40"
-        >
-          {sortedMembers.map(memberId => (
-            <option key={memberId} value={memberId}>
-              {getMemberName(memberId)}
-            </option>
-          ))}
-        </select>
+        <div className="sm:w-40">
+          <MemberAssignmentDropdown
+            members={memberOptions}
+            selectedMember={assignee}
+            onMemberSelect={setAssignee}
+            currentUserId={user?.uid}
+            placeholder="Assign to..."
+          />
+        </div>
         <button onClick={addTask} className="btn-primary">Add</button>
       </div>
 
