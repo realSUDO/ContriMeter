@@ -187,10 +187,17 @@ export const removeUserFromTeam = async (teamCode: string, userUid: string): Pro
     members: updatedMembers
   });
   
+  // Check if user document exists before updating
   const userRef = doc(db, "users", userUid);
-  batch.update(userRef, {
-    joinedTeams: arrayRemove(teamCode)
-  });
+  const userSnap = await getDoc(userRef);
+  
+  if (userSnap.exists()) {
+    batch.update(userRef, {
+      joinedTeams: arrayRemove(teamCode)
+    });
+  } else {
+    console.warn(`User document ${userUid} does not exist, cannot remove team from joinedTeams`);
+  }
   
   await batch.commit();
 };
