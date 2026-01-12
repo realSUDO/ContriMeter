@@ -25,14 +25,14 @@ const GlobalLayout = ({ children }: GlobalLayoutProps) => {
   if (loading || !user) return <>{children}</>;
 
   return (
-    <>
+    <div className={`transition-all duration-300 ${showUserSidebar ? 'pr-16' : 'px-16'}`}>
       {children}
       
       <UserSidebar
         isOpen={showUserSidebar}
         onToggle={toggleSidebar}
       />
-    </>
+    </div>
   );
 };
 

@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserTeams } from "@/hooks/useUserTeams";
 import { logout } from "@/services/auth";
 import { createTeam, joinTeam } from "@/services/teams";
-import { createUserProfile, getUserProfile, addTeamToUser } from "@/services/users";
+import { createUserProfile, getUserProfile, addTeamToUser, syncUserTeams } from "@/services/users";
 import { db } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import TeamCard from "@/components/TeamCard";
@@ -41,6 +41,10 @@ const Dashboard = () => {
           navigate("/profile-setup");
           return;
         }
+        
+        // Sync user's teams to clean up joinedTeams
+        await syncUserTeams(user.uid);
+        
         setUserInitialized(true);
       } catch (error) {
         console.error("Error initializing user:", error);
