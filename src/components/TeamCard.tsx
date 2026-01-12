@@ -26,7 +26,9 @@ const TeamCard = ({ id, name, code, isLeader = false }: TeamCardProps) => {
               <Crown className="w-3.5 h-3.5 text-accent" />
             )}
           </div>
-          <p className="text-sm text-muted-foreground font-mono mt-1">{code}</p>
+          {isLeader && (
+            <p className="text-sm text-muted-foreground font-mono mt-1">{code}</p>
+          )}
         </div>
         <span className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
           →
