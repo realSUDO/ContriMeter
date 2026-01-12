@@ -180,8 +180,17 @@ export const removeUserFromTeam = async (teamCode: string, userUid: string): Pro
   const teamData = teamSnap.data();
   const updatedMembers = teamData.members.filter((id: string) => id !== userUid);
   
-  // Only update team members - user's joinedTeams will be handled by real-time listener
-  await updateDoc(teamRef, {
+  // Update both team members and user's joinedTeams
+  const batch = writeBatch(db);
+  
+  batch.update(teamRef, {
     members: updatedMembers
   });
+  
+  const userRef = doc(db, "users", userUid);
+  batch.update(userRef, {
+    joinedTeams: arrayRemove(teamCode)
+  });
+  
+  await batch.commit();
 };
