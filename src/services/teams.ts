@@ -10,7 +10,8 @@ import {
   updateDoc,
   deleteDoc,
   arrayUnion,
-  serverTimestamp
+  serverTimestamp,
+  writeBatch
 } from "firebase/firestore";
 
 export interface Team {
@@ -90,8 +91,31 @@ export const updateTeam = async (teamCode: string, updates: Partial<Team>): Prom
 };
 
 export const deleteTeam = async (teamCode: string): Promise<void> => {
+  const batch = writeBatch(db);
+  
+  // Delete team document
   const teamRef = doc(db, "teams", teamCode);
-  await deleteDoc(teamRef);
+  batch.delete(teamRef);
+  
+  // Delete all contributions for this team
+  const contributionsRef = collection(db, "contributions");
+  const contributionsQuery = query(contributionsRef, where("teamId", "==", teamCode));
+  const contributionsSnap = await getDocs(contributionsQuery);
+  contributionsSnap.docs.forEach(doc => batch.delete(doc.ref));
+  
+  // Delete all tasks for this team
+  const tasksRef = collection(db, "tasks");
+  const tasksQuery = query(tasksRef, where("teamId", "==", teamCode));
+  const tasksSnap = await getDocs(tasksQuery);
+  tasksSnap.docs.forEach(doc => batch.delete(doc.ref));
+  
+  // Delete all messages for this team
+  const messagesRef = collection(db, "messages");
+  const messagesQuery = query(messagesRef, where("teamId", "==", teamCode));
+  const messagesSnap = await getDocs(messagesQuery);
+  messagesSnap.docs.forEach(doc => batch.delete(doc.ref));
+  
+  await batch.commit();
 };
 
 export const leaveTeam = async (teamCode: string, userUid: string): Promise<void> => {
