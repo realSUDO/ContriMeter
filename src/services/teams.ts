@@ -10,6 +10,7 @@ import {
   updateDoc,
   deleteDoc,
   arrayUnion,
+  arrayRemove,
   serverTimestamp,
   writeBatch
 } from "firebase/firestore";
@@ -93,8 +94,26 @@ export const updateTeam = async (teamCode: string, updates: Partial<Team>): Prom
 export const deleteTeam = async (teamCode: string): Promise<void> => {
   const batch = writeBatch(db);
   
-  // Delete team document
+  // Get team data to find all members
   const teamRef = doc(db, "teams", teamCode);
+  const teamSnap = await getDoc(teamRef);
+  
+  if (teamSnap.exists()) {
+    const teamData = teamSnap.data();
+    const members = teamData.members || [];
+    
+    // Remove team from all users' joinedTeams
+    members.forEach((memberId: string) => {
+      if (memberId !== "common") {
+        const userRef = doc(db, "users", memberId);
+        batch.update(userRef, {
+          joinedTeams: arrayRemove(teamCode)
+        });
+      }
+    });
+  }
+  
+  // Delete team document
   batch.delete(teamRef);
   
   // Delete all contributions for this team
@@ -135,7 +154,43 @@ export const leaveTeam = async (teamCode: string, userUid: string): Promise<void
   const teamData = teamSnap.data();
   const updatedMembers = teamData.members.filter((id: string) => id !== userUid);
   
-  await updateDoc(teamRef, {
+  // Update team members and user's joinedTeams
+  const batch = writeBatch(db);
+  
+  batch.update(teamRef, {
     members: updatedMembers
   });
+  
+  const userRef = doc(db, "users", userUid);
+  batch.update(userRef, {
+    joinedTeams: arrayRemove(teamCode)
+  });
+  
+  await batch.commit();
+};
+
+export const removeUserFromTeam = async (teamCode: string, userUid: string): Promise<void> => {
+  const teamRef = doc(db, "teams", teamCode);
+  const teamSnap = await getDoc(teamRef);
+  
+  if (!teamSnap.exists()) {
+    throw new Error("Team does not exist");
+  }
+
+  const teamData = teamSnap.data();
+  const updatedMembers = teamData.members.filter((id: string) => id !== userUid);
+  
+  // Update team members and user's joinedTeams
+  const batch = writeBatch(db);
+  
+  batch.update(teamRef, {
+    members: updatedMembers
+  });
+  
+  const userRef = doc(db, "users", userUid);
+  batch.update(userRef, {
+    joinedTeams: arrayRemove(teamCode)
+  });
+  
+  await batch.commit();
 };

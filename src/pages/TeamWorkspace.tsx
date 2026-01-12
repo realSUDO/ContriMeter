@@ -48,7 +48,7 @@ const TeamWorkspace = () => {
 
   // Load team data with real-time subscription
   useEffect(() => {
-    if (!teamId) return;
+    if (!teamId || !user?.uid) return;
     
     const timer = setTimeout(() => {
       if (!team) setShowSkeleton(true);
@@ -57,7 +57,16 @@ const TeamWorkspace = () => {
     const teamRef = doc(db, "teams", teamId);
     const unsubscribe = onSnapshot(teamRef, (doc) => {
       if (doc.exists()) {
-        setTeam({ id: doc.id, ...doc.data() });
+        const teamData = { id: doc.id, ...doc.data() };
+        
+        // Check if current user is still a member
+        if (!teamData.members?.includes(user.uid)) {
+          console.log("User no longer a member of this team");
+          navigate("/dashboard");
+          return;
+        }
+        
+        setTeam(teamData);
         setShowSkeleton(false);
       } else {
         console.error("Team not found");
@@ -74,7 +83,7 @@ const TeamWorkspace = () => {
       unsubscribe();
       clearTimeout(timer);
     };
-  }, [teamId, navigate]);
+  }, [teamId, navigate, user?.uid]);
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     if (!teamId) return;

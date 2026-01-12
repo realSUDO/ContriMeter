@@ -1,5 +1,5 @@
 import { db } from "../firebase";
-import { doc, setDoc, getDoc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from "firebase/firestore";
 
 export interface User {
   uid: string;
@@ -71,4 +71,11 @@ export const addTeamToUser = async (uid: string, teamCode: string): Promise<void
 export const updateUserProfile = async (uid: string, updates: Partial<User>): Promise<void> => {
   const userRef = doc(db, "users", uid);
   await updateDoc(userRef, updates);
+};
+
+export const removeTeamFromUser = async (uid: string, teamCode: string): Promise<void> => {
+  const userRef = doc(db, "users", uid);
+  await updateDoc(userRef, {
+    joinedTeams: arrayRemove(teamCode)
+  });
 };
