@@ -153,15 +153,13 @@ const TeamWorkspace = () => {
     if (!team || team.leader !== user?.uid) return; // Only leader can remove members
     
     try {
-      const updatedMembers = team.members.filter((id: string) => id !== memberId);
-      await updateTeam(team.code, { members: updatedMembers });
+      // Use the removeUserFromTeam function which handles both team members and user's joinedTeams
+      const { removeUserFromTeam } = await import("@/services/teams");
+      await removeUserFromTeam(team.code, memberId);
       
       // Reassign the removed member's tasks to common
       const { reassignUserTasksToCommon } = await import("@/services/tasks");
       await reassignUserTasksToCommon(teamId, memberId);
-      
-      // Update local state
-      setTeam({ ...team, members: updatedMembers });
     } catch (error) {
       console.error("Error removing member:", error);
       alert("Failed to remove member. Please try again.");
