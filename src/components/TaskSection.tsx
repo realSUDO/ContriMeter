@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Check, AlertTriangle, MoreVertical, Trash2, Archive, Crown, GripVertical } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import MemberAssignmentDropdown from "./ui/member-assignment-dropdown";
@@ -46,6 +46,7 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [dragOverTask, setDragOverTask] = useState<string | null>(null);
   const [taskOrder, setTaskOrder] = useState<string[]>([]);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const members = teamMembers || [user?.uid].filter(Boolean);
   // Always show "common" at the top of the dropdown
@@ -221,6 +222,20 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
       onMarkDone();
     }
   }, [onMarkDone]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setTaskMenuOpen(null);
+      }
+    };
+
+    if (taskMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [taskMenuOpen]);
 
   const getTaskStatus = (task: Task): "active" | "at-risk" | "inactive" | "completed" => {
     if (task.status === "done") return "completed";
@@ -489,7 +504,7 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
               <StatusBadge status={getTaskStatus(task)} />
               
               {/* Task Menu */}
-              <div className="relative">
+              <div className="relative" ref={menuRef}>
                 <button
                   onClick={(e) => { 
                     e.stopPropagation(); 
