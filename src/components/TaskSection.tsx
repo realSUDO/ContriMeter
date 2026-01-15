@@ -137,6 +137,17 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
         lastActivity: new Date()
       };
       
+      // If task is active and being marked as done, stop the timer and save time
+      if (task.isActive && newStatus === "done") {
+        const stopTaskTimer = (window as any).__stopTaskTimer;
+        if (stopTaskTimer) {
+          const timeSpentMinutes = await stopTaskTimer(taskId);
+          if (timeSpentMinutes > 0) {
+            updates.timeSpent = (task.timeSpent || 0) + timeSpentMinutes;
+          }
+        }
+      }
+      
       // For common tasks, clear the active user when completed and track who completed it
       if (task.assignee === "common") {
         updates.activeUserId = newStatus === "done" ? null : task.activeUserId;

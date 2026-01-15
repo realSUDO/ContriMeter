@@ -32,9 +32,10 @@ interface TimerSectionProps {
   teamId?: string;
   userId?: string;
   tasks: Task[];
+  onStopTask?: (taskId: string) => Promise<void>;
 }
 
-const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: TimerSectionProps) => {
+const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks, onStopTask }: TimerSectionProps) => {
   const [taskTimers, setTaskTimers] = useState<Record<string, number>>({});
   const [activeTaskIds, setActiveTaskIds] = useState<Set<string>>(new Set());
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -202,6 +203,61 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks }: Tim
     // Apply all updates in a single call
     onTaskUpdate(selectedTask.id, updates);
   }, [selectedTask, activeTaskIds, taskTimers, onTaskUpdate, teamId, userId]);
+
+  // Expose stop function for any task
+  const stopAnyTask = useCallback(async (taskId: string) => {
+    if (!activeTaskIds.has(taskId)) return;
+    
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    const duration = taskTimers[taskId] || 0;
+    
+    // Stop timer immediately in UI
+    setActiveTaskIds(prev => {
+      const updated = new Set(prev);
+      updated.delete(taskId);
+      return updated;
+    });
+    setTaskTimers(prev => ({ ...prev, [taskId]: 0 }));
+    
+    if (duration > 0) {
+      const newSession: Session = {
+        id: Date.now().toString(),
+        userId: userId || "",
+        teamId: teamId || "",
+        taskName: task.name,
+        duration,
+        createdAt: new Date(),
+      };
+      setSessions(prev => [newSession, ...prev]);
+      
+      // Background operations
+      if (teamId && userId) {
+        addSession(userId, teamId, task.name, duration);
+      }
+
+      if (teamId) {
+        const contributionUserId = task.assignee === "common" ? (task.activeUserId || userId) : task.assignee;
+        if (contributionUserId && contributionUserId !== "common") {
+          updateContribution(teamId, contributionUserId, duration, 0);
+        }
+      }
+      
+      // Return the time spent to be added to task
+      const totalTimeMinutes = Math.floor(duration / 60);
+      return totalTimeMinutes;
+    }
+    
+    return 0;
+  }, [activeTaskIds, taskTimers, tasks, teamId, userId]);
+
+  // Register the stop callback
+  useEffect(() => {
+    if (onStopTask) {
+      (window as any).__stopTaskTimer = stopAnyTask;
+    }
+  }, [stopAnyTask, onStopTask]);
 
   const stopTaskTimer = useCallback((taskId: string) => {
     if (!activeTaskIds.has(taskId)) return;

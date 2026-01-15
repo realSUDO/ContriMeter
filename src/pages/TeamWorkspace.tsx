@@ -373,6 +373,7 @@ const TeamWorkspace = () => {
               teamId={teamId}
               userId={user?.uid}
               tasks={tasks}
+              onStopTask={async () => {}}
             />
             <ContributionSection 
               teamId={teamId}

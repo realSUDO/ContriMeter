@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Edit3, X, LogOut, Moon, Sun, ArrowRightLeft } from "lucide-react";
+import { User, Edit3, X, LogOut, Moon, Sun, ChevronsLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { updateUserProfile, getUserProfile } from "@/services/users";
 import { logout } from "@/services/auth";
@@ -16,10 +16,34 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showTrapezoid, setShowTrapezoid] = useState(!isOpen);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved === 'dark';
   });
+
+  // Handle trapezoid animation timing
+  useEffect(() => {
+    if (isOpen) {
+      // Hide trapezoid after sidebar opens
+      const timer = setTimeout(() => setShowTrapezoid(false), 300);
+      return () => clearTimeout(timer);
+    } else {
+      // Show trapezoid after sidebar closes
+      const timer = setTimeout(() => setShowTrapezoid(true), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleToggle = () => {
+    if (!isOpen) {
+      // When opening: open sidebar first, trapezoid will hide after
+      onToggle();
+    } else {
+      // When closing: close sidebar immediately
+      onToggle();
+    }
+  };
 
   // Apply theme on mount and when changed
   useEffect(() => {
@@ -84,13 +108,32 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
 
   return (
     <>
+      {/* Trapezoid button - Behind sidebar */}
+      <button
+        onClick={handleToggle}
+        className={`fixed bg-primary shadow-lg hover:shadow-xl text-primary-foreground transition-all duration-300 z-40 flex items-center justify-center ${
+          showTrapezoid && !isOpen ? 'opacity-70 hover:opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          clipPath: 'polygon(0 0, 100% 25%, 100% 75%, 0 100%)',
+          width: '20px',
+          height: '64px',
+          top: 'calc(24px + 0.125rem)',
+          left: showTrapezoid && !isOpen ? '32px' : '0px',
+          borderTopRightRadius: '8px',
+          borderBottomRightRadius: '8px'
+        }}
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+      
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full w-80 bg-card border-r shadow-lg z-50 transition-transform duration-300 ease-in-out ${
         isOpen ? 'translate-x-0' : '-translate-x-72'
       }`}>
         {/* User Icon Button - Inside sidebar */}
         <button
-          onClick={onToggle}
+          onClick={handleToggle}
           className={`absolute bottom-4 p-3 bg-primary rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
             isOpen ? 'right-4' : 'right-[-24px]'
           }`}
@@ -102,14 +145,14 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
         {/* Header with X button - Always visible */}
         <div className="flex items-center justify-between p-6 pb-0">
           <h2 className={`text-lg font-semibold text-foreground transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>Profile</h2>
-          <button
-            onClick={onToggle}
-            className={`text-muted-foreground hover:text-foreground absolute top-6 transition-all duration-300 ${
-              isOpen ? 'right-6 p-1' : 'right-[-24px] p-3 bg-primary rounded-full shadow-lg hover:shadow-xl text-primary-foreground'
-            }`}
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-          </button>
+          {isOpen && (
+            <button
+              onClick={handleToggle}
+              className="text-muted-foreground hover:text-foreground p-1"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Sidebar Content - Only visible when open */}
