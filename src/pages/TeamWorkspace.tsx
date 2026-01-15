@@ -85,6 +85,38 @@ const TeamWorkspace = () => {
     };
   }, [teamId, navigate, user?.uid]);
 
+  // Unselect task on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Check for focused inputs first
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+        
+        if (isInputFocused) {
+          return; // Let input handle ESC
+        }
+        
+        // Check if any modals/overlays are open - look for backdrop elements
+        const hasOpenModal = document.querySelector('.fixed.inset-0.bg-black') || 
+                           document.querySelector('.fixed.inset-0.bg-foreground') ||
+                           document.querySelector('[role="dialog"][data-state="open"]');
+        
+        if (hasOpenModal) {
+          return; // Let modal handle ESC
+        }
+        
+        // Unselect task if one is selected
+        if (selectedTask) {
+          setSelectedTask(null);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTask]);
+
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     if (!teamId) return;
     console.log('onTaskUpdate called:', taskId, updates);
@@ -96,7 +128,7 @@ const TeamWorkspace = () => {
       } else {
         // Create new task
         console.log('Creating new task');
-        await createTask({
+        const taskData = {
           teamId,
           name: updates.name || "New Task",
           assignee: updates.assignee || user?.uid || "Unknown",
@@ -104,7 +136,14 @@ const TeamWorkspace = () => {
           timeSpent: updates.timeSpent || 0,
           isActive: updates.isActive ?? false,
           manuallyMarkedAtRisk: updates.manuallyMarkedAtRisk || false
-        });
+        };
+        
+        // Only add description if it exists and is not empty
+        if (updates.description && updates.description.trim()) {
+          taskData.description = updates.description;
+        }
+        
+        await createTask(taskData);
       }
     } catch (error) {
       console.error("Error updating task:", error);
@@ -112,8 +151,10 @@ const TeamWorkspace = () => {
   };
 
   const handleTaskDelete = async (taskId: string) => {
+    console.log("Attempting to delete task:", taskId);
     try {
       await deleteTask(taskId);
+      console.log("Task deleted successfully:", taskId);
     } catch (error) {
       console.error("Error deleting task:", error);
     }

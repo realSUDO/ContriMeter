@@ -18,6 +18,7 @@ export interface Task {
   id: string;
   teamId: string;
   name: string;
+  description?: string;
   assignee: string;
   status: "pending" | "done";
   timeSpent?: number;

@@ -22,6 +22,13 @@ export const useTeamTasks = (teamId: string | undefined) => {
         createdAt: doc.data().createdAt?.toDate(),
         lastActivity: doc.data().lastActivity?.toDate()
       } as Task));
+      
+      // Sort by createdAt descending (newest first) to ensure new tasks appear at top
+      data.sort((a, b) => {
+        if (!a.createdAt || !b.createdAt) return 0;
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
+      
       setTasks(data);
       setLoading(false);
     });

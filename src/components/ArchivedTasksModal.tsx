@@ -39,6 +39,20 @@ const ArchivedTasksModal = ({ isOpen, onClose, teamId, memberProfiles }: Archive
     return () => unsubscribe();
   }, [isOpen, teamId]);
 
+  // Close modal on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
+
   const handleUnarchive = async (taskId: string) => {
     try {
       await unarchiveTask(taskId);

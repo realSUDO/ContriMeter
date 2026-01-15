@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Check, AlertTriangle, MoreVertical, Trash2, Archive, Crown, GripVertical } from "lucide-react";
+import { Check, AlertTriangle, MoreVertical, Trash2, Archive, Crown, GripVertical, CornerDownLeft, Info } from "lucide-react";
 import StatusBadge from "./StatusBadge";
 import MemberAssignmentDropdown from "./ui/member-assignment-dropdown";
+import TaskDescriptionModal from "./TaskDescriptionModal";
+import TaskCreationModal from "./TaskCreationModal";
 import { useTeamMemberProfiles } from "@/hooks/useTeamMemberProfiles";
 import { updateContribution, decrementContribution } from "@/services/contributions";
 
 interface Task {
   id: string;
   name: string;
+  description?: string;
   assignee: string;
   status: "pending" | "done";
   timeSpent?: number; // in minutes
@@ -46,6 +49,9 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [dragOverTask, setDragOverTask] = useState<string | null>(null);
   const [taskOrder, setTaskOrder] = useState<string[]>([]);
+  const [selectedTaskForDescription, setSelectedTaskForDescription] = useState<Task | null>(null);
+  const [showCreationModal, setShowCreationModal] = useState(false);
+  const [showHint, setShowHint] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const members = teamMembers || [user?.uid].filter(Boolean);
@@ -100,6 +106,8 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
 
   const addTask = useCallback(() => {
     if (!newTask.trim()) return;
+    console.log("Adding task:", newTask);
+    console.log("Current taskOrder:", taskOrder);
     const now = new Date();
     const task: Task = {
       id: Date.now().toString(),
@@ -113,8 +121,40 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
       manuallyMarkedAtRisk: false,
     };
     onTaskUpdate(task.id, task);
+    // Add new task to top of order
+    const newOrder = [task.id, ...taskOrder];
+    console.log("New taskOrder:", newOrder);
+    saveTaskOrder(newOrder);
+    console.log("Clearing input field");
     setNewTask("");
-  }, [newTask, assignee, onTaskUpdate]);
+    setShowHint(false);
+  }, [newTask, assignee, onTaskUpdate, taskOrder, saveTaskOrder]);
+
+  const addTaskWithDescription = useCallback((name: string, description: string) => {
+    const now = new Date();
+    const task: Task = {
+      id: Date.now().toString(),
+      name,
+      description,
+      assignee,
+      status: "pending",
+      timeSpent: 0,
+      isActive: false,
+      lastActivity: now,
+      createdAt: now,
+      manuallyMarkedAtRisk: false,
+    };
+    console.log("Creating task with description:", task);
+    console.log("Current taskOrder:", taskOrder);
+    onTaskUpdate(task.id, task);
+    // Add new task to top of order
+    const newOrder = [task.id, ...taskOrder];
+    console.log("New taskOrder:", newOrder);
+    saveTaskOrder(newOrder);
+    // Clear the input field
+    setNewTask("");
+    setShowHint(false);
+  }, [assignee, onTaskUpdate, taskOrder, saveTaskOrder]);
 
   const toggleStatus = async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -223,6 +263,22 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
     }
   }, [onMarkDone]);
 
+  // Ensure new tasks stay at top when tasks update
+  useEffect(() => {
+    // Don't run if taskOrder is empty (still loading from localStorage)
+    if (taskOrder.length === 0 && tasks.length > 0) return;
+    
+    const currentTaskIds = tasks.map(t => t.id);
+    const newTaskIds = currentTaskIds.filter(id => !taskOrder.includes(id));
+    
+    if (newTaskIds.length > 0) {
+      console.log("Found new tasks not in order:", newTaskIds);
+      const updatedOrder = [...newTaskIds, ...taskOrder.filter(id => currentTaskIds.includes(id))];
+      console.log("Updating taskOrder to put new tasks first:", updatedOrder);
+      saveTaskOrder(updatedOrder);
+    }
+  }, [tasks, taskOrder, saveTaskOrder]);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -268,7 +324,7 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
     if (filter === "active") return status === "active";
     if (filter === "completed") return status === "completed";
     if (filter === "at-risk") return status === "at-risk";
-    if (filter === "inactive") return status === "inactive";
+    if (filter === "inactive") return status === "inactive" || status === "at-risk";
     if (filter === "common") return task.assignee === "common";
     return true;
   }).sort((a, b) => {
@@ -398,15 +454,37 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
       
       {/* Add Task Form */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <input
-          type="text"
-          data-task-input
-          placeholder="New task..."
-          value={newTask}
-          onChange={(e) => setNewTask(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addTask()}
-          className="input-clean flex-1"
-        />
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            data-task-input
+            placeholder="New task..."
+            value={newTask}
+            onChange={(e) => {
+              setNewTask(e.target.value);
+              setShowHint(e.target.value.length > 0);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (e.shiftKey) {
+                  // Open modal for description
+                  e.preventDefault();
+                  setShowCreationModal(true);
+                } else {
+                  // Quick add without description
+                  addTask();
+                }
+              }
+            }}
+            className="input-clean w-full pr-40"
+          />
+          {showHint && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-muted-foreground italic pointer-events-none">
+              <CornerDownLeft className="w-3 h-3" />
+              <span className="italic">for description</span>
+            </div>
+          )}
+        </div>
         <div className="sm:w-40">
           <MemberAssignmentDropdown
             members={memberOptions}
@@ -432,6 +510,7 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
             onDrop={(e) => handleDrop(e, task.id)}
             onDragEnd={handleDragEnd}
             onClick={() => onTaskSelect(selectedTask?.id === task.id ? null : task)}
+            onDoubleClick={() => setSelectedTaskForDescription(task)}
             className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-all duration-200
                        ${selectedTask?.id === task.id 
                          ? "bg-primary/5 ring-1 ring-primary/20" 
@@ -520,6 +599,17 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setSelectedTaskForDescription(task);
+                        setTaskMenuOpen(null);
+                      }}
+                      className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2"
+                    >
+                      <Info className="w-3 h-3" />
+                      Details
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (task.assignee === user?.uid || task.assignee === "common") {
                           onTaskArchive?.(task.id);
                         }
@@ -560,6 +650,19 @@ const TaskSection = ({ onTaskSelect, selectedTask, tasks, onTaskUpdate, onTaskDe
           </p>
         )}
       </div>
+
+      <TaskDescriptionModal 
+        task={selectedTaskForDescription}
+        isOpen={!!selectedTaskForDescription}
+        onClose={() => setSelectedTaskForDescription(null)}
+      />
+
+      <TaskCreationModal
+        isOpen={showCreationModal}
+        initialTaskName={newTask}
+        onSave={addTaskWithDescription}
+        onClose={() => setShowCreationModal(false)}
+      />
     </div>
   );
 };

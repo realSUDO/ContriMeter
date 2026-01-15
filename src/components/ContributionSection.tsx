@@ -43,8 +43,8 @@ const ContributionSection = ({ teamId, teamMembers = [], memberProfiles = {}, ta
     return {
       id: memberId,
       name: memberId === user?.uid 
-        ? `${profile?.name?.slice(0, 8) || "You"} (You)`
-        : profile?.name?.slice(0, 8) || "Unknown",
+        ? `${profile?.name || "You"} (You)`
+        : profile?.name || "Unknown",
       tasksCompleted,
       tasksAssigned,
       timeSpent,
@@ -85,12 +85,14 @@ const ContributionSection = ({ teamId, teamMembers = [], memberProfiles = {}, ta
             >
               <CircularProgress percentage={member.progressPercentage} size={64} strokeWidth={5} />
               
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <h3 className="font-medium text-foreground truncate">{member.name}</h3>
-                  {member.id === teamLeader && (
-                    <Crown className="w-3.5 h-3.5 text-accent flex-shrink-0" />
-                  )}
+              <div className="flex-1 overflow-hidden">
+                <div className="flex items-start gap-2 mb-0.5">
+                  <h3 className="font-medium text-foreground break-words flex-1" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {member.name}
+                    {member.id === teamLeader && (
+                      <Crown className="w-3.5 h-3.5 text-accent inline-block ml-2 -translate-y-0.5" />
+                    )}
+                  </h3>
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <span className="text-sm text-muted-foreground">

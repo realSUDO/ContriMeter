@@ -8,6 +8,7 @@ import { addSession, getTeamSessions, Session } from "@/services/sessions";
 interface Task {
   id: string;
   name: string;
+  description?: string;
   assignee: string;
   status: "pending" | "done";
   timeSpent?: number;
@@ -64,6 +65,20 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks, onSto
       return () => clearInterval(interval);
     }
   }, [teamId, showHistory]);
+
+  // Close session history on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showHistory) {
+        setShowHistory(false);
+      }
+    };
+
+    if (showHistory) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [showHistory]);
 
   const activeTaskIdsRef = useRef<Set<string>>(new Set());
   
@@ -335,7 +350,11 @@ const TimerSection = ({ selectedTask, onTaskUpdate, teamId, userId, tasks, onSto
             
             {selectedTask ? (
               <p className="text-sm text-muted-foreground">
-                Working on: <span className="text-foreground font-medium">{selectedTask.name}</span>
+                {isRunning ? (
+                  <>Working on: <span className="text-foreground font-medium">{selectedTask.name}</span></>
+                ) : (
+                  <>Wanna start: <span className="text-foreground font-medium">{selectedTask.name}?</span></>
+                )}
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">

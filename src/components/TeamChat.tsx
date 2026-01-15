@@ -82,6 +82,33 @@ const TeamChat = ({ isOpen, onClose, teamId, userId, userName }: TeamChatProps) 
     return () => unsubscribe();
   }, [isOpen, teamId]);
 
+  // Close chat on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        // First priority: close emoji picker if open
+        if (showEmojiPicker) {
+          setShowEmojiPicker(false);
+          return;
+        }
+        
+        // Second priority: if an input or textarea is focused, just blur it
+        const activeElement = document.activeElement;
+        if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+          (activeElement as HTMLElement).blur();
+        } else {
+          // Last priority: close the chat
+          onClose();
+        }
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose, showEmojiPicker]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);

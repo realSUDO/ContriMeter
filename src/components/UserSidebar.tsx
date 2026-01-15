@@ -35,6 +35,20 @@ const UserSidebar = ({ isOpen, onToggle }: UserSidebarProps) => {
     }
   }, [isOpen]);
 
+  // Close sidebar on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onToggle();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onToggle]);
+
   const handleToggle = () => {
     if (!isOpen) {
       // When opening: open sidebar first, trapezoid will hide after
