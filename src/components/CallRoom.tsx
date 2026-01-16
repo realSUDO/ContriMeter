@@ -1,10 +1,8 @@
-import { LiveKitRoom, VideoConference, RoomAudioRenderer, useLocalParticipant, useTracks, useRoomContext } from '@livekit/components-react';
+import { LiveKitRoom, VideoConference, RoomAudioRenderer, useLocalParticipant, useRoomContext } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { X, ArrowLeft, Mic, MicOff, Video, VideoOff, MonitorOff, Phone, GripVertical } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import * as React from 'react';
-import { Track } from 'livekit-client';
-import { RnnoiseWorkletNode, loadRnnoise } from '@sapphi-red/web-noise-suppressor';
 import { useNavigate } from 'react-router-dom';
 
 interface CallRoomProps {
@@ -158,50 +156,62 @@ export const FloatingControls = ({ onExpand, onLeave }: { onExpand?: () => void;
   );
 };
 
-const NoiseFilterSetup = () => {
+const MuteOnJoin = () => {
   const { localParticipant } = useLocalParticipant();
 
   useEffect(() => {
-    const setupNoiseFilter = async () => {
-      const audioTrack = localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
-      if (audioTrack?.mediaStreamTrack) {
-        try {
-          const audioContext = new AudioContext();
-          const stream = new MediaStream([audioTrack.mediaStreamTrack]);
-          const source = audioContext.createMediaStreamSource(stream);
-          
-          const rnnoiseWasm = await loadRnnoise({
-            url: 'https://unpkg.com/@sapphi-red/web-noise-suppressor@0.3.5/dist/rnnoise.wasm'
-          });
-          
-          await audioContext.audioWorklet.addModule(
-            'https://unpkg.com/@sapphi-red/web-noise-suppressor@0.3.5/dist/rnnoiseWorklet.js'
-          );
-          
-          const rnnoise = new RnnoiseWorkletNode(audioContext, {
-            wasmBinary: rnnoiseWasm
-          });
-          
-          const destination = audioContext.createMediaStreamDestination();
-          source.connect(rnnoise).connect(destination);
-          
-          const processedTrack = destination.stream.getAudioTracks()[0];
-          await audioTrack.mediaStreamTrack.stop();
-          
-          const sender = audioTrack.sender;
-          if (sender) {
-            await sender.replaceTrack(processedTrack);
-          }
-          console.log('RNNoise enabled successfully');
-        } catch (error) {
-          console.error('Failed to setup RNNoise:', error);
-        }
+    if (localParticipant) {
+      localParticipant.setMicrophoneEnabled(false);
+    }
+  }, [localParticipant]);
+
+  return null;
+};
+
+const NoiseFilterSetup = () => {
+  const { localParticipant } = useLocalParticipant();
+  const gainAppliedRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!localParticipant || gainAppliedRef.current) return;
+
+    const applyGainReduction = async () => {
+      const publication = localParticipant.getTrackPublication('microphone');
+      const audioTrack = publication?.audioTrack;
+      
+      if (!audioTrack?.mediaStreamTrack) {
+        return;
+      }
+
+      try {
+        const audioContext = new AudioContext();
+        const stream = new MediaStream([audioTrack.mediaStreamTrack]);
+        const source = audioContext.createMediaStreamSource(stream);
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = 0.5; // Reduce to 50%
+        const destination = audioContext.createMediaStreamDestination();
+        
+        source.connect(gainNode).connect(destination);
+        
+        const processedTrack = destination.stream.getAudioTracks()[0];
+        await audioTrack.sender?.replaceTrack(processedTrack);
+        
+        gainAppliedRef.current = true;
+        console.log('✅ Microphone gain reduced to 50%');
+      } catch (error) {
+        console.error('Failed to reduce gain:', error);
       }
     };
 
-    if (localParticipant) {
-      setupNoiseFilter();
-    }
+    const interval = setInterval(() => {
+      if (gainAppliedRef.current) {
+        clearInterval(interval);
+      } else {
+        applyGainReduction();
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
   }, [localParticipant]);
 
   // Show first letter in placeholder
@@ -337,6 +347,7 @@ export const CallRoom: React.FC<CallRoomProps> = ({ token, serverUrl, onLeave, o
       } as React.CSSProperties}
       onDisconnected={onDisconnect || onLeave}
     >
+      <MuteOnJoin />
       <NoiseFilterSetup />
       <CallSounds />
       <RoomAudioRenderer />
