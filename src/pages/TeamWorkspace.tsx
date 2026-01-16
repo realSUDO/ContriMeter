@@ -16,6 +16,7 @@ import ArchivedTasksModal from "@/components/ArchivedTasksModal";
 import TeamChat from "@/components/TeamChat";
 import InviteCodeDisplay from "@/components/InviteCodeDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TeamCall } from "@/components/TeamCall";
 
 interface Task {
   id: string;
@@ -323,13 +324,12 @@ const TeamWorkspace = () => {
           </button>
           
           <div className="flex items-center gap-2">
-            <button
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-not-allowed opacity-50"
-              title="Team calls coming soon!"
-              disabled
-            >
-              <Phone className="w-4 h-4" />
-            </button>
+            <TeamCall 
+              teamId={teamId || ""}
+              userId={user?.uid || ""}
+              userName={memberProfiles[user?.uid || ""]?.name || "User"}
+              compact
+            />
             <button
               onClick={() => setShowChat(!showChat)}
               className="p-2 text-muted-foreground hover:text-foreground transition-colors"

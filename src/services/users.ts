@@ -1,5 +1,5 @@
 import { db } from "../firebase";
-import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 
 export interface User {
   uid: string;
