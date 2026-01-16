@@ -1,16 +1,162 @@
-import { LiveKitRoom, VideoConference, RoomAudioRenderer, useLocalParticipant } from '@livekit/components-react';
+import { LiveKitRoom, VideoConference, RoomAudioRenderer, useLocalParticipant, useTracks, useRoomContext } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { X, ArrowLeft, Mic, MicOff, Video, VideoOff, MonitorOff, Phone, GripVertical } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import * as React from 'react';
 import { Track } from 'livekit-client';
 import { RnnoiseWorkletNode, loadRnnoise } from '@sapphi-red/web-noise-suppressor';
+import { useNavigate } from 'react-router-dom';
 
 interface CallRoomProps {
   token: string;
   serverUrl: string;
   onLeave: () => void;
+  onDisconnect?: () => void;
+  teamId?: string;
+  onMinimize?: () => void;
+  isMinimized?: boolean;
+  onMaximize?: () => void;
 }
+
+export const FloatingControls = ({ onExpand, onLeave }: { onExpand?: () => void; onLeave?: () => void }) => {
+  const { localParticipant } = useLocalParticipant();
+  const [isMuted, setIsMuted] = useState(true);
+  const [isVideoOff, setIsVideoOff] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  
+  const [position, setPosition] = useState(() => {
+    const saved = localStorage.getItem('floating_controls_position');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return { x: window.innerWidth - 520, y: 38 };
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const updateState = () => {
+      if (localParticipant) {
+        setIsMuted(!localParticipant.isMicrophoneEnabled);
+        setIsVideoOff(!localParticipant.isCameraEnabled);
+        setIsScreenSharing(localParticipant.isScreenShareEnabled);
+      }
+    };
+    
+    updateState();
+    const interval = setInterval(updateState, 200);
+    return () => clearInterval(interval);
+  }, [localParticipant]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.closest('button')) return;
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        const newPosition = {
+          x: e.clientX - dragOffset.x,
+          y: e.clientY - dragOffset.y
+        };
+        setPosition(newPosition);
+        localStorage.setItem('floating_controls_position', JSON.stringify(newPosition));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
+
+  const toggleMic = () => {
+    localParticipant.setMicrophoneEnabled(isMuted);
+  };
+
+  const toggleVideo = () => {
+    localParticipant.setCameraEnabled(isVideoOff);
+  };
+
+  const stopScreenShare = async () => {
+    await localParticipant.setScreenShareEnabled(false);
+  };
+
+  return (
+    <div 
+      className="fixed z-[999] bg-card backdrop-blur-sm px-2 py-2 flex gap-2 select-none border rounded-full shadow-lg" 
+      style={{ left: `${position.x}px`, top: `${position.y}px` }}
+    >
+      <div 
+        className="flex items-center px-1 cursor-move"
+        onMouseDown={handleMouseDown}
+      >
+        <GripVertical className="w-4 h-4 text-muted-foreground" />
+      </div>
+      
+      {onExpand && (
+        <button
+          onClick={onExpand}
+          className="p-2 rounded-full bg-green-600 hover:bg-green-700 transition-colors cursor-pointer"
+          title="Expand call"
+        >
+          <Phone className="w-4 h-4 text-white" />
+        </button>
+      )}
+      
+      <button
+        onClick={toggleMic}
+        className="p-2 rounded-full bg-background hover:bg-accent transition-colors cursor-pointer"
+        title={isMuted ? 'Unmute' : 'Mute'}
+      >
+        {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+      </button>
+      
+      <button
+        onClick={toggleVideo}
+        className="p-2 rounded-full bg-background hover:bg-accent transition-colors cursor-pointer"
+        title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
+      >
+        {isVideoOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+      </button>
+
+      {isScreenSharing && (
+        <button
+          onClick={stopScreenShare}
+          className="p-2 rounded-full bg-orange-600 hover:bg-orange-700 transition-colors cursor-pointer"
+          title="Stop sharing"
+        >
+          <MonitorOff className="w-4 h-4 text-white" />
+        </button>
+      )}
+
+      {onLeave && (
+        <button
+          onClick={onLeave}
+          className="p-2 rounded-full bg-red-600 hover:bg-red-700 transition-colors cursor-pointer"
+          title="Leave call"
+        >
+          <X className="w-4 h-4 text-white" />
+        </button>
+      )}
+    </div>
+  );
+};
 
 const NoiseFilterSetup = () => {
   const { localParticipant } = useLocalParticipant();
@@ -79,7 +225,67 @@ const NoiseFilterSetup = () => {
   return null;
 };
 
-export const CallRoom: React.FC<CallRoomProps> = ({ token, serverUrl, onLeave }) => {
+const CallSounds = () => {
+  const room = useRoomContext();
+  const joinSound = React.useRef<HTMLAudioElement | null>(null);
+  const leaveSound = React.useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const join = new Audio('/assets/join.mp3');
+    const leave = new Audio('/assets/leave.mp3');
+    
+    join.preload = 'auto';
+    leave.preload = 'auto';
+    join.load();
+    leave.load();
+    
+    join.volume = 0.5;
+    leave.volume = 0.5;
+    
+    joinSound.current = join;
+    leaveSound.current = leave;
+  }, []);
+
+  useEffect(() => {
+    if (!room) return;
+
+    const handleConnected = () => {
+      console.log('🎵 You joined the call');
+      joinSound.current?.play().catch(e => console.error('Join sound error:', e));
+    };
+
+    const handleParticipantConnected = (participant: any) => {
+      console.log('🎵 Participant joined:', participant.identity);
+      joinSound.current?.play().catch(e => console.error('Join sound error:', e));
+    };
+
+    const handleParticipantDisconnected = (participant: any) => {
+      console.log('🎵 Participant left:', participant.identity);
+      leaveSound.current?.play().catch(e => console.error('Leave sound error:', e));
+    };
+
+    const handleDisconnected = () => {
+      console.log('🎵 You left the call');
+      leaveSound.current?.play().catch(e => console.error('Leave sound error:', e));
+    };
+
+    room.on('connected', handleConnected);
+    room.on('participantConnected', handleParticipantConnected);
+    room.on('participantDisconnected', handleParticipantDisconnected);
+    room.on('disconnected', handleDisconnected);
+
+    return () => {
+      room.off('connected', handleConnected);
+      room.off('participantConnected', handleParticipantConnected);
+      room.off('participantDisconnected', handleParticipantDisconnected);
+      room.off('disconnected', handleDisconnected);
+    };
+  }, [room]);
+
+  return null;
+};
+
+export const CallRoom: React.FC<CallRoomProps> = ({ token, serverUrl, onLeave, onDisconnect, teamId, onMinimize, isMinimized, onMaximize }) => {
   const [isDark, setIsDark] = React.useState(false);
 
   React.useEffect(() => {
@@ -106,34 +312,52 @@ export const CallRoom: React.FC<CallRoomProps> = ({ token, serverUrl, onLeave })
     onLeave();
   };
 
+  const handleBackToDashboard = () => {
+    if (onMinimize) {
+      onMinimize();
+    }
+  };
+
   const bgColor = isDark ? '#1a1a1a' : '#f5f5f5';
   const tileColor = isDark ? '#2a2a2a' : '#e8e8e8';
 
   return (
-    <div className="fixed inset-0 z-50" style={{ backgroundColor: bgColor }}>
-      <div className="h-full w-full p-8 flex items-center justify-center">
-        <div className="w-full max-w-6xl h-full">
-          <LiveKitRoom
-            token={token}
-            serverUrl={serverUrl}
-            connect={true}
-            audio={false}
-            video={false}
-            data-lk-theme={isDark ? 'dark' : 'default'}
-            style={{ 
-              height: '100%', 
-              width: '100%',
-              '--lk-bg': bgColor,
-              '--lk-bg2': tileColor,
-            } as React.CSSProperties}
-            onDisconnected={handleLeave}
-          >
-            <NoiseFilterSetup />
+    <LiveKitRoom
+      token={token}
+      serverUrl={serverUrl}
+      connect={true}
+      audio={false}
+      video={false}
+      data-lk-theme={isDark ? 'dark' : 'default'}
+      style={{ 
+        height: '100%', 
+        width: '100%',
+        '--lk-bg': bgColor,
+        '--lk-bg2': tileColor,
+      } as React.CSSProperties}
+      onDisconnected={onDisconnect || onLeave}
+    >
+      <NoiseFilterSetup />
+      <CallSounds />
+      <RoomAudioRenderer />
+      
+      <div className={`fixed inset-0 z-50 ${isMinimized ? 'pointer-events-none opacity-0' : ''}`} style={{ backgroundColor: bgColor }}>
+        <button
+          onClick={handleBackToDashboard}
+          className="fixed top-1 left-14 z-[999] text-grey px-4 py-2 flex items-center gap-2 transition-colors hover:opacity-80"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Team
+        </button>
+        
+        <div className="h-full w-full p-8 flex items-center justify-center">
+          <div className="w-full max-w-6xl h-full">
             <VideoConference />
-            <RoomAudioRenderer />
-          </LiveKitRoom>
+          </div>
         </div>
       </div>
+      
+      {isMinimized && <FloatingControls onExpand={onMaximize} onLeave={onLeave} />}
       
       <style>{`
         [data-lk-theme] {
@@ -151,6 +375,23 @@ export const CallRoom: React.FC<CallRoomProps> = ({ token, serverUrl, onLeave })
           overflow: hidden !important;
           background-color: ${tileColor} !important;
           border: 2px solid #000 !important;
+        }
+        .lk-participant-tile video {
+          object-fit: contain !important;
+        }
+        .lk-participant-tile[data-lk-source="screen_share"],
+        .lk-participant-tile[data-lk-source="screen_share_audio"] {
+          max-width: 100% !important;
+          max-height: 100% !important;
+          width: 100% !important;
+          height: 100% !important;
+          flex: 1 !important;
+        }
+        .lk-participant-tile[data-lk-source="screen_share"] video,
+        .lk-participant-tile[data-lk-source="screen_share_audio"] video {
+          object-fit: contain !important;
+          width: 100% !important;
+          height: 100% !important;
         }
         .lk-focus-layout-wrapper .lk-participant-tile,
         .lk-focused-participant .lk-participant-tile {
@@ -381,6 +622,9 @@ export const CallRoom: React.FC<CallRoomProps> = ({ token, serverUrl, onLeave })
         .lk-chat-toggle {
           display: none !important;
         }
+        .lk-start-audio-button {
+          display: none !important;
+        }
         .lk-video-conference {
           display: flex !important;
           flex-direction: column !important;
@@ -396,6 +640,8 @@ export const CallRoom: React.FC<CallRoomProps> = ({ token, serverUrl, onLeave })
           margin-top: auto !important;
         }
       `}</style>
-    </div>
+    </LiveKitRoom>
   );
 };
+
+export default CallRoom;

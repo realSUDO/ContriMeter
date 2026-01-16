@@ -17,6 +17,7 @@ import TeamChat from "@/components/TeamChat";
 import InviteCodeDisplay from "@/components/InviteCodeDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TeamCall } from "@/components/TeamCall";
+import { LiveKitService } from "@/services/livekit";
 
 interface Task {
   id: string;
@@ -39,6 +40,9 @@ const TeamWorkspace = () => {
   const [team, setTeam] = useState<any>(null);
   const [showArchivedModal, setShowArchivedModal] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [isInCall, setIsInCall] = useState(false);
+  const [activeCallCount, setActiveCallCount] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
   const [isEditingTeamName, setIsEditingTeamName] = useState(false);
@@ -85,6 +89,17 @@ const TeamWorkspace = () => {
       clearTimeout(timer);
     };
   }, [teamId, navigate, user?.uid]);
+
+  // Subscribe to active call participants
+  useEffect(() => {
+    if (!teamId) return;
+    
+    const unsubscribe = LiveKitService.subscribeToActiveCall(teamId, (count) => {
+      setActiveCallCount(count);
+    });
+    
+    return unsubscribe;
+  }, [teamId, isInCall]);
 
   // Unselect task on ESC key
   useEffect(() => {
@@ -324,18 +339,37 @@ const TeamWorkspace = () => {
           </button>
           
           <div className="flex items-center gap-2">
-            <TeamCall 
-              teamId={teamId || ""}
-              userId={user?.uid || ""}
-              userName={memberProfiles[user?.uid || ""]?.name || "User"}
-              compact
-            />
+            <div className="relative">
+              <TeamCall 
+                teamId={teamId || ""}
+                userId={user?.uid || ""}
+                userName={memberProfiles[user?.uid || ""]?.name || "User"}
+                compact
+                onCallStateChange={(inCall, isMinimized) => {
+                  setIsInCall(inCall);
+                  if (inCall && !isMinimized) {
+                    setShowChat(false);
+                  }
+                }}
+              />
+              {activeCallCount > 0 && !isInCall && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
+            </div>
             <button
-              onClick={() => setShowChat(!showChat)}
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => {
+                setShowChat(!showChat);
+                if (!showChat) {
+                  setHasUnreadMessages(false);
+                }
+              }}
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors relative"
               title="Team chat"
             >
               <MessageCircle className="w-4 h-4" />
+              {hasUnreadMessages && !showChat && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
             </button>
             <button
               onClick={() => setShowArchivedModal(true)}
@@ -453,6 +487,11 @@ const TeamWorkspace = () => {
         teamId={teamId || ""}
         userId={user?.uid || ""}
         userName={memberProfiles[user?.uid || ""]?.name || "User"}
+        onNewMessage={() => {
+          if (!showChat) {
+            setHasUnreadMessages(true);
+          }
+        }}
       />
 
     </div>

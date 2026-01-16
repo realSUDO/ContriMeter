@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Paperclip, Download, Meh, Laugh, CircleArrowUp } from "lucide-react";
 import EmojiPicker from 'emoji-picker-react';
 import { subscribeToTeamMessages, sendMessage, ChatMessage } from "@/services/chat";
@@ -10,10 +10,22 @@ interface TeamChatProps {
   teamId: string;
   userId: string;
   userName: string;
+  onNewMessage?: () => void;
 }
 
-const TeamChat = ({ isOpen, onClose, teamId, userId, userName }: TeamChatProps) => {
+const TeamChat = ({ isOpen, onClose, teamId, userId, userName, onNewMessage }: TeamChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const prevMessageCountRef = React.useRef(0);
+  const lastReadTimestampRef = React.useRef<number>(0);
+  
+  // Load last read timestamp from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(`lastReadMessage_${teamId}`);
+    if (saved) {
+      lastReadTimestampRef.current = parseInt(saved);
+    }
+  }, [teamId]);
+  
   const [newMessage, setNewMessage] = useState(() => {
     // Load draft from localStorage on init
     const draft = localStorage.getItem(`chatDraft_${teamId}`);
@@ -76,11 +88,33 @@ const TeamChat = ({ isOpen, onClose, teamId, userId, userName }: TeamChatProps) 
   }, [isResizing]);
 
   useEffect(() => {
-    if (!isOpen || !teamId) return;
+    if (!teamId) return;
 
-    const unsubscribe = subscribeToTeamMessages(teamId, setMessages);
+    const unsubscribe = subscribeToTeamMessages(teamId, (newMessages) => {
+      if (newMessages.length > prevMessageCountRef.current) {
+        const latestMessage = newMessages[newMessages.length - 1];
+        const messageTimestamp = latestMessage.createdAt?.getTime() || 0;
+        
+        if (latestMessage.userId !== userId && 
+            messageTimestamp > lastReadTimestampRef.current && 
+            onNewMessage) {
+          onNewMessage();
+        }
+      }
+      prevMessageCountRef.current = newMessages.length;
+      setMessages(newMessages);
+    });
     return () => unsubscribe();
-  }, [isOpen, teamId]);
+  }, [teamId, userId, onNewMessage, isOpen]);
+  
+  // Mark messages as read when chat is opened
+  useEffect(() => {
+    if (isOpen && messages.length > 0) {
+      const latestTimestamp = messages[messages.length - 1]?.createdAt?.getTime() || 0;
+      lastReadTimestampRef.current = latestTimestamp;
+      localStorage.setItem(`lastReadMessage_${teamId}`, latestTimestamp.toString());
+    }
+  }, [isOpen, messages, teamId]);
 
   // Close chat on ESC key
   useEffect(() => {
