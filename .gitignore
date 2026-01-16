@@ -18,6 +18,9 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+api/.env
+functions/.env
+backend/.env
 
 # Firebase
 .firebase/
@@ -41,3 +44,4 @@ kiro/
 # Documentation
 JITSI_INTEGRATION.md
 todo.md
+.vercel

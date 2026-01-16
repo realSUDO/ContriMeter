@@ -1,4 +1,3 @@
-import { AccessToken } from 'livekit-server-sdk';
 import { db } from '@/firebase';
 import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
 
@@ -8,28 +7,28 @@ export class LiveKitService {
     userId: string,
     userName: string
   ): Promise<string> {
-    const roomName = `team-${teamId}`;
-    const apiKey = import.meta.env.VITE_LIVEKIT_API_KEY;
-    const apiSecret = import.meta.env.VITE_LIVEKIT_API_SECRET;
-    
-    if (!apiKey || !apiSecret) {
-      throw new Error('LiveKit credentials not configured');
-    }
-    
     try {
-      const token = new AccessToken(apiKey, apiSecret, {
-        identity: userId,
-        name: userName,
-      });
+      const apiUrl = import.meta.env.VITE_VERCEL_API_URL || 'http://localhost:3000';
       
-      token.addGrant({
-        roomJoin: true,
-        room: roomName,
-        canPublish: true,
-        canSubscribe: true,
+      const response = await fetch(`${apiUrl}/api/livekit/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          roomName: `team-${teamId}`,
+          participantName: userName,
+          userId,
+          teamId,
+        }),
       });
-      
-      return await token.toJwt();
+
+      if (!response.ok) {
+        throw new Error(`Token generation failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.token;
     } catch (error) {
       console.error('Failed to generate LiveKit token:', error);
       throw error;
